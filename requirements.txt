@@ -1,0 +1,4 @@
+# AIPoeTool — Faza 1
+# Aplikacja korzysta wyłącznie ze standardowej biblioteki Pythona (urllib, json, unittest).
+# Brak zewnętrznych zależności wymaganych do uruchomienia programu.
+# Testy można uruchomić poleceniem: python -m unittest discover -s .

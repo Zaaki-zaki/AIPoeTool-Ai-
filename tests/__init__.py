@@ -1,0 +1,1 @@
+"""Pakiet testów AIPoeTool."""
