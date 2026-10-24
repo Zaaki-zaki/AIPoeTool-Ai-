@@ -1,27 +1,15 @@
 [project]
-name = "poe1-build-assistant"
+name = "aipoetool"
 version = "0.1.0"
-description = "Path of Exile 1 Build Assistant"
-authors = [
-    {name = "AI Assistant", email = "ai@example.com"}
-]
+requires-python = ">=3.12,<3.14"
 dependencies = [
-    "pydantic>=2.0.0,<3.0.0",
-    "pytest>=7.0.0",
-    "zlib-ng>=1.0.0",
-    "base64",
+    "pydantic>=2",
+    "httpx",
 ]
 
-[build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project.scripts]
-poe-parser = "app.parser:main"
+[dependency-groups]
+dev = ["pytest"]
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = "-v"
