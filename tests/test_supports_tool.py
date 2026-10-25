@@ -29,9 +29,10 @@ class FakeEngine:
     """DPS = 1000 * iloczyn mnożników supportów; wszystko inne stałe. Zapamiętuje stan grupy."""
 
     def __init__(self, gems: list[dict[str, Any]], mult: dict[str, float], source: str | None = None,
-                 skill: str = "Cyclone") -> None:
+                 skill: str = "Cyclone", ehp: dict[str, float] | None = None) -> None:
         self.current = [dict(g) for g in gems]
         self.mult = mult
+        self.ehp = ehp or {}
         self.source = source
         self.skill = skill
         self.calls = 0
@@ -40,7 +41,14 @@ class FakeEngine:
         return [{"index": 1, "slot": "Weapon 1", "source": self.source, "gems": [dict(g) for g in self.current]}]
 
     def set_main(self, group: int, skill_index: int = 1) -> dict[str, Any]:
-        return {"MainSkill": self.skill, "CombinedDPS": self._dps(self.current), "Life": 1000.0}
+        return {"MainSkill": self.skill, "CombinedDPS": self._dps(self.current), "Life": 1000.0,
+                "TotalEHP": self._ehp(self.current)}
+
+    def _ehp(self, gems: list[dict[str, Any]]) -> float:
+        v = 10000.0
+        for g in gems:
+            v *= self.ehp.get(g["name"], 1.0)
+        return v
 
     def _dps(self, gems: list[dict[str, Any]]) -> float:
         v = 1000.0
@@ -51,7 +59,8 @@ class FakeEngine:
     def set_group(self, group: int, gems: list[dict[str, Any]]) -> dict[str, Any]:
         self.calls += 1
         self.current = [dict(g) for g in gems]
-        return {"stats": {"CombinedDPS": self._dps(gems), "Life": 1000.0}, "gem_errors": []}
+        return {"stats": {"CombinedDPS": self._dps(gems), "Life": 1000.0, "TotalEHP": self._ehp(gems)},
+                "gem_errors": []}
 
 
 def _by_color(db: GameDB, skill: str = "Cyclone") -> dict[str, list[str]]:
@@ -151,6 +160,34 @@ def test_replace_mode_reports_value_of_each_support(db: GameDB) -> None:
     assert row["current"] == cur
     assert math.isclose(row["value_of_current_pct"], 20.0, abs_tol=0.01)
     assert row["best_replacements"][0]["support"] == better
+
+
+@needs_db
+def test_ehp_floor_keeps_survivability_gem_in_the_ranking(db: GameDB) -> None:
+    """Para z wyższym DPS, ale bez gemu dającego EHP, nie może wygrać z parą z tym gemem."""
+    c = _by_color(db)
+    dps_gem, other, ehp_gem = c["B"][0], c["B"][1], c["B"][2]
+    eng = FakeEngine(
+        [CYCLONE, {"name": ehp_gem, "level": 20, "quality": 0}],
+        {dps_gem: 1.6, other: 1.5, ehp_gem: 1.3},
+        ehp={ehp_gem: 1.5},
+    )
+    # keep=[] zdejmuje ehp_gem i zwalnia jego socket; próg liczony względem pełnego, oryginalnego buildu
+    res = recommend_supports(eng, db, BUILD, 1, keep=[], pool_size=3, top_n=3)
+    assert res["ranking"][0]["supports"] == [ehp_gem]
+    assert any(e["supports"] != [ehp_gem] for e in res["excluded_by_floor"])
+    assert "TotalEHP" in res["excluded_by_floor"][0]["reason"]
+
+
+@needs_db
+def test_floor_can_be_disabled(db: GameDB) -> None:
+    c = _by_color(db)
+    dps_gem, ehp_gem = c["B"][0], c["B"][2]
+    eng = FakeEngine([CYCLONE, {"name": ehp_gem, "level": 20, "quality": 0}],
+                     {dps_gem: 1.6, ehp_gem: 1.3}, ehp={ehp_gem: 1.5})
+    res = recommend_supports(eng, db, BUILD, 1, keep=[], pool_size=3, floor={})
+    assert res["ranking"][0]["supports"] == [dps_gem]
+    assert res["excluded_by_floor"] == []
 
 
 @needs_db

@@ -19,6 +19,10 @@ from app.parser.models import Build
 COLOR_LETTER = {1: "R", 2: "G", 3: "B", 4: "W"}
 SIDE_STATS = ("Life", "EnergyShield", "TotalEHP", "ManaUnreserved", "LifeUnreserved")
 
+# Domyślne progi: wynik nie może pogorszyć tych statów poniżej podanej części OBECNEGO buildu
+# (stan grupy sprzed jakichkolwiek zmian). Wyłączenie: floor={}.
+DEFAULT_FLOOR = {"TotalEHP": 0.95}
+
 NOT_CHECKED = [
     "Ograniczenia broni po stronie supporta/skilla (PoB policzy je jako brak efektu, czyli ~0% zysku).",
     "Wymagania atrybutów (Str/Dex/Int) gemów - liczone są tylko poziom postaci i kolor socketu.",
@@ -75,12 +79,15 @@ def recommend_supports(
     pool_size: int = 12,
     max_combo_sims: int = 400,
     blind_spot_band_pct: float = 0.5,
+    floor: dict[str, float] | None = None,
 ) -> dict[str, Any]:
     """Zwraca ranking uzupełnień wolnych socketów (tryb 'fill') albo podmian pojedynczych supportów ('replace').
 
     - free_sockets=["R","W"]: grupa ma 2 wolne sockety (kolory R/G/B/W), obecne gemy zostają.
     - keep=[...]: zostają tylko wymienione supporty, reszta jest zdejmowana i ich sockety stają się wolne.
     - bez obu: tryb 'replace' - dla każdego obecnego supportu najlepszy zamiennik i jego wartość.
+    - floor={"TotalEHP": 0.95}: wyniki, które obniżają dany stat poniżej tej części obecnego buildu,
+      są wykluczone z rankingu (domyślnie EHP >= 95%). floor={} wyłącza progi.
     Stan silnika po wywołaniu jest przywracany do oryginalnej grupy.
     """
     if group < 1 or group > len(engine.groups()):
@@ -92,6 +99,7 @@ def recommend_supports(
         return _run(
             engine, db, build, group, skill_index, original, free_sockets, keep, metric, top_n,
             gem_level, gem_quality, pool_size, max_combo_sims, blind_spot_band_pct,
+            DEFAULT_FLOOR if floor is None else floor,
         )
     finally:
         engine.set_group(group, original["gems"])
@@ -101,9 +109,18 @@ def _run(
     engine: EngineLike, db: GameDB, build: Build, group: int, skill_index: int,
     original: dict[str, Any], free_sockets: list[str] | None, keep: list[str] | None,
     metric: str, top_n: int, gem_level: int, gem_quality: int, pool_size: int,
-    max_combo_sims: int, band: float,
+    max_combo_sims: int, band: float, floors: dict[str, float],
 ) -> dict[str, Any]:
     main_stats = engine.set_main(group, skill_index)
+    orig_stats = dict(main_stats)  # stan sprzed zmian: punkt odniesienia dla progów
+
+    def violation(stats: dict[str, Any]) -> str | None:
+        for key, ratio in floors.items():
+            ref, val = orig_stats.get(key), stats.get(key)
+            if ref and val is not None and val < ref * ratio:
+                return f"{key} spadłoby do {val / ref:.0%} obecnego (próg {ratio:.0%})"
+        return None
+
     skill_name = main_stats.get("MainSkill")
     gem = db.gem(skill_name) if skill_name else None
     if gem is None or gem["is_support"]:
@@ -180,17 +197,20 @@ def _run(
     result: dict[str, Any] = {
         "mode": mode, "skill": skill_name, "metric": metric, "baseline": round(base_val, 2),
         "free_sockets": free, "candidates_evaluated": 0, "not_checked": NOT_CHECKED,
+        "floor": floors, "excluded_by_floor": [],
         "rejected": [{"name": n, "reason": r} for n, r in rejected],
     }
 
     if mode == "replace":
         return _replace(engine, group, gems, original, db, candidates, spec, metric, base_val,
-                        base_stats, side, result, top_n, band)
+                        base_stats, side, result, top_n, band, violation)
 
     singles = []
+    single_stats: dict[str, dict[str, Any]] = {}
     for c in candidates:
         s = engine.set_group(group, gems + [spec(c)])["stats"]
         singles.append((s.get(metric, 0), c))
+        single_stats[c["name"]] = s
     result["candidates_evaluated"] = len(singles)
     singles.sort(key=lambda t: t[0], reverse=True)
     result["blind_spots"] = [
@@ -203,6 +223,12 @@ def _run(
 
     k = len(free)
     pool = [c for _, c in singles[:pool_size]]
+    # gemy pomagające statom z progów (np. EHP) mogą mieć słaby DPS, ale muszą trafić do puli kombinacji
+    for key in floors:
+        best_for_key = sorted(
+            (c for _, c in singles), key=lambda c: single_stats[c["name"]].get(key, 0), reverse=True
+        )[:4]
+        pool += [c for c in best_for_key if c not in pool]
     combos = [
         combo for combo in itertools.combinations(pool, k)
         if _assignable([c["letter"] for c in combo], free)
@@ -212,8 +238,16 @@ def _run(
     scored = []
     for combo in combos:
         s = engine.set_group(group, gems + [spec(c) for c in combo])["stats"]
+        why = violation(s)
+        if why:
+            result["excluded_by_floor"].append(
+                {"supports": [c["name"] for c in combo], "delta_pct": _pct(s.get(metric, 0), base_val),
+                 "reason": why})
+            continue
         scored.append((s.get(metric, 0), combo, s))
-    result["combos_evaluated"] = len(scored)
+    result["combos_evaluated"] = len(scored) + len(result["excluded_by_floor"])
+    result["excluded_by_floor"].sort(key=lambda r: r["delta_pct"] or 0, reverse=True)
+    result["excluded_by_floor"] = result["excluded_by_floor"][:top_n]
     scored.sort(key=lambda t: t[0], reverse=True)
     result["ranking"] = [
         {
@@ -226,7 +260,7 @@ def _run(
 
 
 def _replace(engine, group, gems, original, db, candidates, spec, metric, base_val, base_stats, side,
-             result, top_n, band):  # noqa: ANN001
+             result, top_n, band, violation):  # noqa: ANN001
     """Dla każdego obecnego supportu: ile jest wart (strata po zdjęciu) i co byłoby lepszym zamiennikiem."""
     report = []
     sims = 0
@@ -244,6 +278,8 @@ def _replace(engine, group, gems, original, db, candidates, spec, metric, base_v
                 continue  # zamiennik musi pasować do koloru zwalnianego socketu
             s = engine.set_group(group, without + [spec(c)])["stats"]
             sims += 1
+            if violation(s):
+                continue
             best.append((s.get(metric, 0), c, s))
         best.sort(key=lambda t: t[0], reverse=True)
         report.append({
