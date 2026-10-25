@@ -352,7 +352,7 @@ class GameDB:
             if weapon_type and sup["weapon_types"] and weapon_type not in sup["weapon_types"]:
                 continue
             out.append({
-                "name": r["name"], "color": sup["color"],
+                "name": r["name"], "effect_id": r["effect_id"], "color": sup["color"],
                 "req": {"str": r["req_str"], "dex": r["req_dex"], "int": r["req_int"]},
                 "max_level": r["max_level"], "flags": f,
             })
