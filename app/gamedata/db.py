@@ -134,7 +134,8 @@ def _expr_matches(expr: list[str], types: set[str]) -> bool:
 class GameDB:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
-        self.con = sqlite3.connect(str(self.path))
+        # baza tylko do odczytu, a żądania webowe idą z puli wątków; dostęp serializuje blokada sesji
+        self.con = sqlite3.connect(str(self.path), check_same_thread=False)
         self.con.row_factory = sqlite3.Row
 
     def close(self) -> None:
@@ -415,6 +416,17 @@ class GameDB:
         for r in self.con.execute(
             "SELECT * FROM uniques WHERE name = ? COLLATE NOCASE", (name,)
         ):
+            d = dict(r)
+            for k in ("props", "variants", "implicits", "explicits"):
+                d[k] = json.loads(d[k])
+            out.append(d)
+        return out
+
+    def uniques_in(self, files: tuple[str, ...] | list[str]) -> list[dict[str, Any]]:
+        """Wszystkie uniki z podanych kategorii (kolumna `file`, np. 'helmet', 'ring')."""
+        marks = ",".join("?" for _ in files)
+        out = []
+        for r in self.con.execute(f"SELECT * FROM uniques WHERE file IN ({marks}) ORDER BY name", tuple(files)):
             d = dict(r)
             for k in ("props", "variants", "implicits", "explicits"):
                 d[k] = json.loads(d[k])

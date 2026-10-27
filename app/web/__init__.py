@@ -1,0 +1,1 @@
+"""Interfejs w przeglądarce (FastAPI)."""

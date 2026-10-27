@@ -25,6 +25,13 @@ def _engine_available() -> bool:
     if os.environ.get("POB_ENGINE_CMD"):
         return True
     try:
+        from app.calc import setup
+        from app.calc.engine import native_available
+        if native_available() and setup.ready():  # silnik natywny (lupa) z pobranym PoB
+            return True
+    except ImportError:
+        pass
+    try:
         r = subprocess.run(["docker", "image", "inspect", "aipoetool-pob"], capture_output=True)
         return r.returncode == 0
     except OSError:
@@ -124,3 +131,19 @@ def test_every_db_compatible_support_loads_in_pob(engine: PobEngine) -> None:
     for sup in db.compatible_supports("Cyclone")[:25]:
         res = engine.set_group(group["index"], keep + [{"name": sup["name"], "level": 20}])
         assert res["gem_errors"] == [], f"{sup['name']}: {res['gem_errors']}"
+
+
+def test_native_setup_extract(tmp_path):
+    import io
+    import zipfile
+    from app.calc import setup
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("PoB-abc/src/HeadlessWrapper.lua", "x")
+        z.writestr("PoB-abc/runtime/lua/dkjson.lua", "x")
+        z.writestr("PoB-abc/src/Assets/a.png", "x")
+        z.writestr("PoB-abc/src/TreeData/3_29/skills-3.jpg", "x")
+        z.writestr("PoB-abc/docs/readme.md", "x")
+    dest = tmp_path / "pob"
+    assert setup.extract(b.getvalue(), dest) == 3 and (dest / "src" / "TreeData" / "3_29" / "skills-3.jpg").exists()
+    assert (dest / "src" / "HeadlessWrapper.lua").exists() and not (dest / "src" / "Assets").exists()

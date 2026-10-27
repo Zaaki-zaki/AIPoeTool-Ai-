@@ -1,0 +1,1103 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIPoeTool</title>
+<style>
+  :root {
+    --bg: #0c1315; --sheet: #111b1e; --raise: #172529; --line: #233539; --line2: #2e464b;
+    --text: #dbdfd6; --dim: #8fa1a0; --faint: #5f7478;
+    --calc: #5cc2c4;      /* policzone w PoB */
+    --calc-bg: #5cc2c414;
+    --unv: #d9a441;       /* dane ze społeczności, niezweryfikowane */
+    --gold: #c8a45c; --ok: #7fd36b; --bad: #e5604a; --accent: #5cc2c4;
+    --fire: #e0775f; --cold: #6fa8e8; --light: #e6cb5a; --chaos: #b57be0;
+    --head: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", sans-serif;
+    --body: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --num: "Bahnschrift", "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--body); display: grid; grid-template-rows: 44px 1fr; overflow: hidden; }
+  :focus-visible { outline: 2px solid var(--calc); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 5px; border: 2px solid var(--bg); } ::-webkit-scrollbar-track { background: transparent; }
+
+  header { display: flex; align-items: center; gap: 22px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--sheet); }
+  header h1 { margin: 0; font: 600 17px/1 var(--head); letter-spacing: .02em; font-stretch: 85%; }
+  header h1 span { color: var(--calc); }
+  .spacer { flex: 1; }
+  .st { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--dim); }
+  .st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .st.ok::before { background: var(--ok); } .st.bad::before { background: var(--bad); } .st.bad { color: var(--bad); }
+
+  button { background: transparent; color: var(--text); border: 1px solid var(--line2); border-radius: 4px; padding: 6px 14px; cursor: pointer; font: 500 13.5px var(--body); transition: border-color .12s, background .12s; }
+  button:hover { border-color: var(--calc); background: var(--calc-bg); }
+  button:disabled { opacity: .45; cursor: wait; }
+  button.primary { background: var(--calc); color: #06191b; border-color: var(--calc); font-weight: 600; }
+  button.primary:hover { background: #7bd3d5; }
+  header button { padding: 4px 12px; font-size: 13px; }
+
+  main { display: grid; grid-template-columns: 330px 1fr; min-height: 0; }
+  aside { border-right: 1px solid var(--line); background: var(--sheet); overflow-y: auto; padding: 16px 16px 24px; }
+  .sec { font: 600 12px var(--head); letter-spacing: .06em; color: var(--faint); margin: 20px 0 8px; font-stretch: 90%; }
+  .sec:first-child { margin-top: 0; }
+  details#import summary { cursor: pointer; font: 600 13px var(--head); color: var(--calc); list-style: none; padding: 2px 0; }
+  details#import summary::-webkit-details-marker { display: none; }
+  details#import summary::before { content: "+ "; }
+  details#import[open] summary::before { content: "− "; }
+  textarea { width: 100%; margin-top: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font: 12px var(--num); resize: vertical; }
+  #load-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  #load-msg { font-size: 12.5px; color: var(--dim); } #load-msg.ok { color: var(--ok); } #load-msg.bad { color: var(--bad); }
+
+  #summary { margin-top: 18px; }
+  .who { font: 600 20px/1.2 var(--head); font-stretch: 88%; }
+  .who small { display: block; font: 400 13px var(--body); color: var(--dim); margin-top: 2px; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+  .tile { background: var(--raise); padding: 8px 10px; }
+  .tile span { display: block; font-size: 11.5px; color: var(--dim); }
+  .tile b { font: 600 21px/1.25 var(--num); font-variant-numeric: tabular-nums; }
+  .tile.main { grid-column: 1 / 3; } .tile.main b { font-size: 28px; color: var(--calc); }
+  .res { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 8px; text-align: center; font: 600 14px var(--num); }
+  .res span { display: block; font: 400 10.5px var(--body); color: var(--faint); }
+  .kv { font-size: 13px; color: var(--dim); margin-top: 10px; } .kv b { color: var(--text); font-weight: 500; }
+  .grp { font-size: 13px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .grp:first-of-type { border-top: 0; }
+  .grp .sk { font-weight: 600; } .grp .su { color: var(--dim); display: block; font-size: 12.5px; }
+  .grp .no { color: var(--faint); font: 11px var(--num); margin-right: 6px; }
+  .warn { color: var(--unv); font-size: 12.5px; margin-top: 8px; }
+
+  .chat { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  #log { flex: 1; overflow-y: auto; padding: 22px 28px 8px; scroll-behavior: smooth; }
+  .col { max-width: 820px; margin: 0 auto; }
+  .q { margin: 22px auto 10px; max-width: 820px; font: 600 16px/1.4 var(--head); font-stretch: 92%; color: #fff; display: flex; gap: 10px; }
+  .q::before { content: "›"; color: var(--calc); font-weight: 700; }
+  .calc { max-width: 820px; margin: 0 auto 2px; font: 12.5px/1.5 var(--num); color: var(--dim); padding-left: 20px; }
+  .calc b { font-weight: 600; } .calc.ok b { color: var(--calc); } .calc.err b { color: var(--bad); } .calc.run::after { content: " …"; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .pbar { max-width: 820px; margin: 6px auto 10px; padding-left: 20px; display: flex; align-items: center; gap: 12px; }
+  .pbar .track { flex: 1; height: 6px; border-radius: 3px; background: var(--line2); overflow: hidden; }
+  .pbar .fill { height: 100%; width: 0; background: var(--calc); border-radius: 3px; transition: width .25s linear; }
+  .pbar .pct { font: 600 12.5px var(--num); color: var(--dim); min-width: 38px; text-align: right; }
+  .ans { max-width: 820px; margin: 10px auto 6px; padding: 2px 0 2px 18px; border-left: 3px solid var(--line2); }
+  .ans.verified { border-left-color: var(--calc); }
+  .ans.err { border-left-color: var(--bad); color: var(--bad); }
+  .ans p { margin: 0 0 .7em; } .ans ul { margin: 0 0 .8em; padding-left: 1.2em; } .ans li { margin: .15em 0; }
+  .ans h4 { font: 600 14px var(--head); margin: 1em 0 .3em; color: #fff; }
+  .ans strong { color: #fff; font-weight: 600; }
+  .ans code { font: 13px var(--num); background: var(--raise); padding: 1px 5px; border-radius: 3px; }
+  .scope { max-width: 820px; margin: 0 auto 6px; padding: 8px 12px 8px 18px; font-size: 12.5px; color: var(--dim); background: var(--calc-bg); border-radius: 0 4px 4px 0; border-left: 3px solid var(--calc); }
+  .scope.unv { background: #d9a44114; border-left: 3px dashed var(--unv); }
+  .scope b { color: var(--text); font-weight: 600; }
+  .treebtn { max-width: 820px; margin: 4px auto 10px; padding-left: 18px; }
+  .hint { max-width: 640px; margin: 11vh auto 0; }
+  .hint h2 { font: 600 26px/1.2 var(--head); font-stretch: 85%; margin: 0 0 10px; }
+  .hint p { color: var(--dim); margin: 0 0 14px; }
+  .hint .rule { display: grid; grid-template-columns: 14px 1fr; gap: 4px 12px; font-size: 13.5px; color: var(--dim); margin-top: 18px; }
+  .hint .rule i { width: 14px; height: 0; border-top: 3px solid var(--calc); margin-top: .7em; } .hint .rule i.u { border-top: 3px dashed var(--unv); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .chip { cursor: pointer; border: 1px solid var(--line2); border-radius: 4px; padding: 5px 12px; font-size: 13.5px; background: var(--sheet); }
+  .chip:hover { border-color: var(--calc); background: var(--calc-bg); }
+
+  .composer { padding: 10px 28px 16px; background: linear-gradient(transparent, var(--bg) 30%); }
+  .composer .col { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .goal { grid-column: 1 / 3; display: flex; gap: 0; align-items: center; font-size: 12.5px; color: var(--dim); }
+  .goal span { margin-right: 10px; }
+  .goal button { border-radius: 0; padding: 3px 12px; font-size: 12.5px; margin-left: -1px; color: var(--dim); }
+  .goal button:first-of-type { border-radius: 4px 0 0 4px; } .goal button:last-of-type { border-radius: 0 4px 4px 0; }
+  .goal button.on { background: var(--calc-bg); border-color: var(--calc); color: var(--calc); position: relative; z-index: 1; }
+  .composer input { background: var(--sheet); color: var(--text); border: 1px solid var(--line2); border-radius: 4px; padding: 11px 14px; font: inherit; min-width: 0; }
+  .composer input:focus { border-color: var(--calc); outline: none; }
+  .composer button { padding: 0 22px; }
+
+  /* ---- drzewko ---- */
+  #tree-modal { position: fixed; inset: 0; background: rgba(5,9,10,.92); display: none; z-index: 10; }
+  #tree-modal.open { display: grid; grid-template-columns: 360px 1fr; grid-template-rows: 44px 1fr; }
+  #tree-bar { grid-column: 1 / 3; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--sheet); }
+  #tree-bar b { font: 600 14px var(--head); } #tree-msg { color: var(--dim); font-size: 13px; }
+  #tree-bar button { padding: 3px 12px; font-size: 13px; }
+  #tree-list { overflow-y: auto; padding: 10px; background: var(--sheet); border-right: 1px solid var(--line); }
+  .opt { border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; cursor: pointer; font-size: 13px; }
+  .opt:hover { border-color: var(--line2); } .opt.active { border-color: var(--calc); background: var(--calc-bg); }
+  .opt .t { font-weight: 600; } .opt .d { color: var(--dim); font-size: 12px; margin-top: 3px; }
+  .opt .gain { color: var(--ok); } .opt .loss { color: var(--bad); } .opt.blocked .t { color: var(--bad); }
+  .opt .rm { color: #e5604a; } .opt .ad { color: #7fd36b; }
+  #tree-wrap { position: relative; min-width: 0; min-height: 0; }
+  #tree-canvas { width: 100%; height: 100%; display: block; cursor: grab; } #tree-canvas.drag { cursor: grabbing; }
+  #tree-tip { position: absolute; pointer-events: none; background: #050a0bee; border: 1px solid var(--line2); border-radius: 4px; padding: 6px 10px; font-size: 12.5px; display: none; max-width: 340px; z-index: 2; }
+  #tree-tip .nm { color: var(--gold); font-weight: 600; } #tree-tip .tp { color: var(--dim); font-size: 11px; }
+  #tree-tip .ln { margin-top: 2px; } #tree-tip .st-add { color: #7fd36b; } #tree-tip .st-rem { color: #e5604a; }
+  #tree-legend { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--dim); background: #050a0bcc; padding: 4px 10px; border-radius: 4px; }
+  #tree-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: -1px; } #tree-legend i:first-child { margin-left: 0; }
+  .opt.donegrp { opacity: .55; }
+  #guide-modal { position: fixed; inset: 0; background: var(--bg, #0b1214); z-index: 25; display: none; grid-template-rows: 44px 1fr; }
+  #guide-modal.open { display: grid; } #guide-bar { display: flex; gap: 10px; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--line); }
+  #guide-bar .spacer { flex: 1; } #guide-body { overflow: auto; padding: 18px max(16px, calc(50% - 400px)); line-height: 1.55; }
+  #guide-body h1 { font-size: 24px; color: var(--gold); } #guide-body h2 { font-size: 19px; color: var(--gold); margin-top: 28px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  #guide-body h3 { font-size: 15px; } #guide-body ul { padding-left: 20px; } #guide-body pre { white-space: pre-wrap; word-break: break-all; background: #050a0b; border: 1px solid var(--line); padding: 8px; border-radius: 4px; font-size: 11px; max-height: 90px; overflow: auto; }
+  #tree-bar select { background: var(--raise); color: inherit; border: 1px solid var(--line2); border-radius: 4px; padding: 4px 6px; font: inherit; }
+
+  /* ---- ceny i klejnoty ---- */
+  .pane { position: fixed; inset: 0; background: var(--bg); z-index: 22; display: none; grid-template-rows: 44px 1fr; }
+  .pane.open { display: grid; }
+  .pane-bar { display: flex; gap: 10px; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--sheet); }
+  .pane-bar b { font: 600 14px var(--head); } .pane-bar select, .pane input[type=text], .pane input[type=number], .pane textarea, .pane select { background: var(--raise); color: inherit; border: 1px solid var(--line2); border-radius: 4px; padding: 5px 8px; font: inherit; font-size: 13px; min-width: 0; }
+  .pane textarea { width: 100%; resize: vertical; font: 12px/1.45 var(--num); }
+  .pane-body { display: grid; grid-template-columns: 380px 1fr; min-height: 0; }
+  .pane-side { overflow-y: auto; padding: 14px; background: var(--sheet); border-right: 1px solid var(--line); }
+  .pane-main { overflow: auto; padding: 16px 20px; min-width: 0; }
+  .pane label.f { display: grid; gap: 4px; font-size: 12.5px; color: var(--dim); margin-bottom: 10px; }
+  .pane .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .pane .muted { color: var(--dim); font-size: 12.5px; } .pane .gain { color: var(--ok); } .pane .loss { color: var(--bad); }
+  .itemcard { border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 4px; padding: 8px 10px; margin: 10px 0; font-size: 13px; }
+  .itemcard .nm { font-weight: 600; color: var(--gold); }
+  .flt { display: grid; grid-template-columns: 18px 1fr 64px; gap: 6px; align-items: center; font-size: 12.5px; padding: 3px 0; border-top: 1px solid var(--line); }
+  .flt.off { color: var(--faint); } .flt input[type=number] { width: 64px; }
+  table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.tbl th { text-align: left; font: 600 12px var(--head); color: var(--faint); padding: 6px 8px; border-bottom: 1px solid var(--line2); position: sticky; top: 0; background: var(--bg); }
+  table.tbl td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.tbl td.num { font: 13px var(--num); white-space: nowrap; } .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); margin-right: 5px; } .dot.on { background: var(--ok); }
+  .tabs { display: flex; gap: 0; } .tabs button { border-radius: 0; margin-left: -1px; } .tabs button.on { background: var(--calc-bg); border-color: var(--calc); color: var(--calc); position: relative; z-index: 1; }
+  .sum { display: flex; gap: 22px; margin: 0 0 12px; } .sum div { font-size: 12px; color: var(--dim); } .sum b { display: block; font: 600 18px var(--num); color: var(--text); }
+  .small { font-size: 12px; padding: 2px 8px !important; }
+  @media (max-width: 860px) { .pane-body { grid-template-columns: 1fr; overflow-y: auto; } }
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--raise); border: 1px solid var(--line2); border-left: 3px solid var(--unv); padding: 9px 16px; border-radius: 4px; font-size: 13.5px; max-width: 520px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 30; }
+  #toast.on { opacity: 1; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; overflow-y: auto; } aside { border-right: 0; border-bottom: 1px solid var(--line); } body { overflow: auto; } #tree-modal.open { grid-template-columns: 1fr; grid-template-rows: 44px 200px 1fr; } #tree-bar { grid-column: 1; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>AIPoe<span>Tool</span></h1>
+  <span id="st-model" class="st">model …</span>
+  <span id="st-ollama" class="st">Ollama …</span>
+  <span id="st-db" class="st">baza …</span>
+  <span class="spacer"></span>
+  <button id="open-jewels" type="button">Klejnoty</button>
+  <button id="open-price" type="button">Ceny</button>
+  <button id="open-plan" type="button">Plan rozwoju</button>
+  <button id="open-tree" type="button">Drzewko pasywne</button>
+</header>
+
+<div id="price-pane" class="pane">
+  <div class="pane-bar"><b>Sprawdzanie cen</b><span class="muted" id="pr-hint">W grze: najedź na item i naciśnij Ctrl+D.</span><span class="spacer"></span>
+    <select id="pr-league" title="Liga"></select><select id="pr-status" title="Status sprzedawcy"><option value="securable">instant buyout</option><option value="available">buyout + osobiście</option><option value="online">online</option><option value="any">dowolny</option></select>
+    <button id="pr-close" type="button">Zamknij</button></div>
+  <div class="pane-body">
+    <div class="pane-side">
+      <label class="f">Tekst itemu (Ctrl+C w grze albo skrót Ctrl+D)<textarea id="pr-text" rows="9" placeholder="Item Class: Rings&#10;Rarity: Rare&#10;…"></textarea></label>
+      <div class="row"><button id="pr-go" class="primary" type="button">Sprawdź cenę</button><label class="muted">podobieństwo <input id="pr-pct" type="number" min="50" max="100" value="90" style="width:58px"> %</label></div>
+      <div id="pr-item"></div><div id="pr-filters"></div>
+      <div class="row" id="pr-refine" hidden><button id="pr-again" type="button">Szukaj z tymi filtrami</button></div>
+    </div>
+    <div class="pane-main" id="pr-main"><p class="muted">Wynik pojawi się tutaj. Ceny pochodzą z oficjalnego trade; to oferty, a nie zrealizowane transakcje.</p></div>
+  </div>
+</div>
+<div id="jewel-pane" class="pane">
+  <div class="pane-bar"><b>Klejnoty</b><div class="tabs"><button id="jw-t1" class="on" type="button">Sockety</button><button id="jw-t2" type="button">Timeless: szukaj seedów</button></div><span class="spacer"></span><span class="muted" id="jw-msg"></span><button id="jw-close" type="button">Zamknij</button></div>
+  <div class="pane-body" id="jw-body">
+    <div class="pane-side" id="jw-side"></div>
+    <div class="pane-main" id="jw-main"></div>
+  </div>
+</div>
+<div id="guide-modal"><div id="guide-bar"><b>Poradnik</b><button id="guide-copy" type="button">Kopiuj całość</button><span class="spacer"></span><button id="guide-close" type="button">Zamknij</button></div><div id="guide-body"></div></div>
+<div id="tree-modal">
+  <div id="tree-bar">
+    <b>Podgląd drzewka</b>
+    <button id="tree-fit" type="button">Dopasuj do zmian</button>
+    <button id="tree-all" type="button">Całe drzewko</button>
+    <button id="plan-done" type="button" hidden>Wzięte do tego kroku</button>
+    <button id="plan-code" type="button" hidden>Kopiuj kod PoB etapu</button>
+    <button id="plan-guide" type="button" hidden>Poradnik</button>
+    <select id="free-cls" hidden title="Klasa"></select><select id="free-asc" hidden title="Ascendancy"></select>
+    <button id="free-code" type="button" hidden>Kopiuj kod PoB</button>
+    <button id="free-clear" type="button" hidden>Wyczyść drzewko</button>
+    <span id="tree-msg"></span><span class="spacer"></span>
+    <button id="tree-close" type="button">Zamknij</button>
+  </div>
+  <div id="tree-list"></div>
+  <div id="tree-wrap">
+    <canvas id="tree-canvas"></canvas><div id="tree-tip"></div>
+    <div id="tree-legend"><i style="background:#c8a45c"></i>obecne<i style="background:#7fd36b"></i>nowe<i style="background:#e5604a"></i>zwolnione</div>
+  </div>
+</div>
+<main>
+  <aside>
+    <details id="import" open>
+      <summary>Build z Path of Building</summary>
+      <textarea id="code" rows="6" placeholder="Wklej kod z PoB: Import/Export → Generate"></textarea>
+      <div id="load-row"><button id="load" class="primary">Załaduj build</button><span id="load-msg"></span></div>
+    </details>
+    <div id="summary"></div>
+  </aside>
+  <section class="chat">
+    <div id="log">
+      <div class="hint" id="hint">
+        <h2>Zapytaj o swój build</h2>
+        <p>Wklej kod PoB po lewej i pytaj po polsku albo zacznij bez buildu: aplikacja zaproponuje postać i rozpisze rozwój punkt po punkcie. Każda liczba w odpowiedzi pochodzi z obliczeń Path of Building, a nie z pamięci modelu.</p>
+        <div class="chips" id="chips"><span class="chip" tabindex="0">Nie mam pomysłu na postać, w co grać?</span><span class="chip" tabindex="0">Gram melee, zaplanuj mi rozwój od zera</span></div>
+        <div class="rule"><i></i><span>Linia turkusowa: policzone w PoB.</span><i class="u"></i><span>Linia przerywana: dane ze społeczności (ceny, wiki), niezweryfikowane.</span></div>
+      </div>
+    </div>
+    <form class="composer" id="form">
+      <div class="col">
+        <div class="goal" role="group" aria-label="Cel rankingu">
+          <span>Cel</span>
+          <button type="button" data-g="" class="on">Wg pytania</button>
+          <button type="button" data-g="damage">Obrażenia</button>
+          <button type="button" data-g="balanced">Zbalansowany</button>
+          <button type="button" data-g="defence">Obrona</button>
+        </div>
+        <input id="q" placeholder="np. mam 2 wolne sockety w Cyclone, jakie supporty będą najlepsze?" autocomplete="off">
+        <button id="send" class="primary" type="submit">Wyślij</button>
+      </div>
+    </form>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const log = $("log");
+let loaded = false, goal = "";
+
+function st(el, text, ok) { el.textContent = text; el.className = "st " + (ok ? "ok" : "bad"); }
+
+document.querySelectorAll(".goal button").forEach(b => b.onclick = () => {
+  goal = b.dataset.g;
+  document.querySelectorAll(".goal button").forEach(x => x.classList.toggle("on", x === b));
+});
+
+async function refreshStatus() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    st($("st-model"), s.model, true);
+    st($("st-ollama"), s.ollama_ok ? "Ollama działa" : "Ollama nie odpowiada", s.ollama_ok);
+    st($("st-db"), s.db_ok ? "baza gry" : "brak bazy gry", s.db_ok);
+    if (s.build) { loaded = true; renderSummary(s.build); $("import").open = false; }
+  } catch (e) { st($("st-ollama"), "serwer nie odpowiada", false); }
+}
+
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = (n) => n >= 1e6 ? (n / 1e6).toFixed(2) + " mln" : n >= 1e4 ? (n / 1e3).toFixed(1) + " tys." : String(Math.round(n));
+
+function renderSummary(b) {
+  const s = b.stats || {};
+  const res = [["Ogień", "FireResist", "--fire"], ["Zimno", "ColdResist", "--cold"], ["Błyskawica", "LightningResist", "--light"], ["Chaos", "ChaosResist", "--chaos"]]
+    .map(([n, k, c]) => `<div style="color:var(${c})">${Math.round(s[k] ?? 0)}%<span>${n}</span></div>`).join("");
+  const groups = b.skill_groups.filter(g => !g.from_item).map(g =>
+    `<div class="grp"><span class="no">${g.slot || "#" + g.group}</span><span class="sk">${esc(g.active_skills.join(", "))}</span>` +
+    (g.supports.length ? `<span class="su">${esc(g.supports.join(", "))}</span>` : "") + `</div>`).join("");
+  $("summary").innerHTML =
+    `<div class="sec">Postać</div><div class="who">${esc(b.ascendancy || b.class)}<small>${esc(b.class)}, poziom ${b.level} · skill w PoB: ${esc(b.main_skill_in_pob || "?")}</small></div>` +
+    `<div class="tiles"><div class="tile main"><span>DPS łączny</span><b>${fmt(s.CombinedDPS || 0)}</b></div>` +
+    `<div class="tile"><span>Życie</span><b>${fmt(s.Life || 0)}</b></div><div class="tile"><span>Energy Shield</span><b>${fmt(s.EnergyShield || 0)}</b></div>` +
+    `<div class="tile main"><span>EHP</span><b style="color:var(--text)">${fmt(s.TotalEHP || 0)}</b></div></div>` +
+    `<div class="res">${res}</div>` +
+    `<div class="kv">Keystone'y: <b>${esc((b.tree.keystones || []).join(", ") || "brak")}</b></div>` +
+    `<div class="sec">Grupy skilli</div>${groups}` +
+    (b.warnings.length ? `<div class="warn">${b.warnings.map(esc).join("<br>")}</div>` : "");
+  const chips = $("chips");
+  if (chips && b.skill_groups.length) {
+    const skills = [...new Set(b.skill_groups.filter(g => !g.from_item).flatMap(g => g.active_skills.map(a => a.replace(/ \d+\/\d+$/, ""))))].slice(0, 3);
+    const qs = [`Jakie supporty najlepiej pasują do ${skills[0] || "mojego skilla"}?`, "Co mogę ulepszyć w buildzie?", "Co zmienić w drzewku?"];
+    chips.innerHTML = qs.map(q => `<span class="chip" tabindex="0">${esc(q)}</span>`).join("");
+    chips.querySelectorAll(".chip").forEach(c => { c.onclick = () => { $("q").value = c.textContent; $("q").focus(); }; c.onkeydown = (e) => { if (e.key === "Enter") c.click(); }; });
+  }
+}
+
+$("load").onclick = async () => {
+  const code = $("code").value.trim(); if (!code) return;
+  $("load").disabled = true; const m = $("load-msg"); m.className = ""; m.textContent = "ładuję, to potrwa kilka sekund…";
+  try {
+    const r = await fetch("/api/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || "błąd");
+    loaded = true; renderSummary(data); m.className = "ok"; m.textContent = "załadowano";
+    $("import").open = false; $("code").value = "";
+    log.innerHTML = ""; await fetch("/api/reset", { method: "POST" });
+  } catch (e) { m.className = "bad"; m.textContent = e.message; }
+  $("load").disabled = false;
+};
+
+function add(cls, text) {
+  const d = document.createElement("div"); d.className = cls; if (text) d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+}
+
+// proste formatowanie odpowiedzi: **pogrubienie**, `kod`, listy, nagłówki (po ucieczce HTML)
+function inline(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>"); }
+function renderMd(text) {
+  let html = "", list = false, para = [];
+  const flush = () => { if (para.length) { html += "<p>" + para.map(inline).join("<br>") + "</p>"; para = []; } };
+  const closeList = () => { if (list) { html += "</ul>"; list = false; } };
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd(), li = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/), h = line.match(/^#{1,4}\s+(.*)$/);
+    if (li) { flush(); if (!list) { html += "<ul>"; list = true; } html += "<li>" + inline(li[1]) + "</li>"; }
+    else if (h) { flush(); closeList(); html += "<h4>" + inline(h[1]) + "</h4>"; }
+    else if (!line.trim()) { flush(); closeList(); }
+    else { closeList(); para.push(line); }
+  }
+  flush(); closeList(); return html;
+}
+
+function addAnswer(text, verified) {
+  const m = text.match(/\n*(Zakres sprawdzenia:[\s\S]*)$/);
+  const body = m ? text.slice(0, m.index) : text;
+  const a = document.createElement("div"); a.className = "ans" + (verified ? " verified" : ""); a.innerHTML = renderMd(body); log.appendChild(a);
+  if (m) {
+    const sc = document.createElement("div"); sc.className = "scope" + (/NIEZWERYFIKOWANE/.test(m[1]) ? " unv" : "");
+    sc.innerHTML = esc(m[1]).replace(/(Zakres sprawdzenia:|Nie sprawdzono:|Niedostępne źródła:|Cel rankingu:)/g, "<b>$1</b>"); log.appendChild(sc);
+  }
+  log.scrollTop = log.scrollHeight;
+}
+
+// Pasek postępu myślenia. Ollama nie podaje procentów, więc: czas oczekiwania względem średniej z poprzednich odpowiedzi
+// (zapisywanej w przeglądarce), a przy planie rozwoju prawdziwy postęp sekcji. Do odpowiedzi nie przekracza 97%.
+function progressBar() {
+  const el = add("pbar", ""); el.innerHTML = '<div class="track"><div class="fill"></div></div><span class="pct">0%</span>';
+  const fill = el.querySelector(".fill"), pct = el.querySelector(".pct"), t0 = Date.now();
+  let shown = 0, realFrac = null, timer = null, closed = false;
+  const key = () => "aipoe_eta_" + (realFrac != null ? "plan" : "chat");
+  const eta = () => { try { return parseFloat(localStorage.getItem(key())) || (realFrac != null ? 120 : 20); } catch (e) { return 20; } };
+  const set = (v) => { shown = Math.max(shown, Math.min(100, v)); fill.style.width = shown + "%"; pct.textContent = Math.floor(shown) + "%"; };
+  const tick = () => {
+    const t = (Date.now() - t0) / 1000;
+    const est = realFrac != null ? 6 + 91 * realFrac : 97 * (1 - Math.exp(-t / (eta() * 0.6)));
+    set(Math.min(97, est));
+  };
+  timer = setInterval(tick, 200); tick();
+  const end = () => { closed = true; clearInterval(timer); };
+  return {
+    el,
+    real(f) { realFrac = Math.max(0, Math.min(1, f)); tick(); },
+    finish() {
+      if (closed) return; end();
+      const dur = (Date.now() - t0) / 1000;
+      try { const k = key(), old = parseFloat(localStorage.getItem(k)); localStorage.setItem(k, String(old ? old * 0.6 + dur * 0.4 : dur)); } catch (e) { /* bez zapisu */ }
+      set(100); setTimeout(() => el.remove(), 350);
+    },
+    stop() { if (!closed) end(); el.remove(); },
+  };
+}
+
+$("form").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const question = $("q").value.trim(); if (!question) return;
+  const hint = $("hint"); if (hint) hint.remove();
+  add("q", question); $("q").value = ""; $("send").disabled = true;
+  const bar = progressBar(); let usedTree = false, calc = false;
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, goal: goal || null }) });
+    if (!r.ok) { bar.stop(); add("ans err", (await r.json()).detail || "błąd"); }
+    else {
+      const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+      while (true) {
+        const { value, done } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf("\n\n")) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+          if (!line.startsWith("data:")) continue;
+          const e = JSON.parse(line.slice(5));
+          if (e.type === "progress" && e.frac != null) bar.real(e.frac);
+          else if (e.type === "tool_result") {  // bez komunikatów o narzędziach: użytkownik widzi tylko odpowiedź
+            if (e.ok && e.name !== "community_info" && e.name !== "get_gem_info" && e.name !== "search_uniques" && e.name !== "lookup_knowledge") calc = true;
+            if (e.ok && e.name === "recommend_tree") usedTree = true;
+          }
+          else if (e.type === "answer") {
+            bar.finish();
+            addAnswer(e.text, calc);
+            if (usedTree) { const b = add("treebtn", ""); const btn = document.createElement("button"); btn.textContent = "Pokaż zmiany na drzewku"; btn.onclick = () => openTree(true); b.append(btn); }
+          }
+          else if (e.type === "error") { bar.stop(); add("ans err", e.text); }
+        }
+      }
+    }
+  } catch (e) { add("ans err", "Brak połączenia z serwerem: " + e.message); }
+  bar.stop(); $("send").disabled = false; $("q").focus();
+};
+
+// ---------------------------------------------------------------- podgląd drzewka
+const cv = $("tree-canvas"), ctx = cv.getContext("2d"), tip = $("tree-tip");
+let TREE = null, sel = -1, view = { x: 0, y: 0, s: 0.05 }, hoverNode = null;
+const COL = { off: "#33464b", alloc: "#c8a45c", add: "#7fd36b", rem: "#e5604a", linkOff: "#1c2a2e" };
+const WR = { N: 26, T: 46, K: 70, M: 36, S: 46, C: 40, A: 40 }, MINPX = { N: 1.3, T: 2.4, K: 3.4, M: 1.8, S: 2.6, C: 2, A: 2 };
+let addSet = new Set(), remSet = new Set();
+
+function closeTree() { $("tree-modal").classList.remove("open"); }
+function leavePlanMode() { planMode = false; freeMode = false; ["free-cls", "free-asc", "free-code", "free-clear"].forEach(i => $(i).hidden = true); $("plan-done").hidden = true; $("plan-code").hidden = true; $("plan-guide").hidden = true; $("tree-legend").innerHTML = '<i style="background:#c8a45c"></i>obecne<i style="background:#7fd36b"></i>nowe<i style="background:#e5604a"></i>zwolnione'; }
+$("tree-close").onclick = closeTree;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeTree(); });
+$("open-tree").onclick = async () => {
+  let loaded = true;
+  try { loaded = (await (await fetch("/api/status")).json()).build_loaded; } catch (e) { /* zostaje podgląd buildu */ }
+  loaded ? openTree(false) : openFree();
+};
+$("tree-fit").onclick = () => fitView(true);
+$("tree-all").onclick = () => fitView(false);
+
+async function openTree(first) {
+  leavePlanMode();
+  $("tree-modal").classList.add("open");
+  $("tree-msg").textContent = "ładuję drzewko…";
+  try {
+    const r = await fetch("/api/tree"), d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "błąd");
+    TREE = d; TREE.byId = new Map(d.nodes.map(n => [n.id, n])); TREE.alloc = new Set(d.alloc); loadSprites(d.tree_version);
+    buildList(); selectOpt(first && d.options.length ? 0 : -1);
+    $("tree-msg").textContent = d.options.length ? "" : "Brak zamian: zapytaj o drzewko (np. „co zmienić w drzewku?”), a pojawią się tutaj.";
+  } catch (e) { $("tree-msg").textContent = e.message; }
+}
+
+function mk(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+function buildList() {
+  const list = $("tree-list"); list.innerHTML = "";
+  const items = [{ label: "Obecne drzewko", kind: "base" }, ...TREE.options];
+  items.forEach((o, k) => {
+    const el = mk("div", "opt" + (o.kind === "blocked" ? " blocked" : "")); el.dataset.i = k - 1;
+    el.append(mk("div", "t", o.label));
+    if (o.kind !== "base") {
+      const g = mk("div", "d"), dp = o.delta_pct;
+      const gain = mk("span", dp >= 0 ? "gain" : "loss", (dp >= 0 ? "+" : "") + dp + "% metryki");
+      g.append(gain);
+      const se = Object.entries(o.side_effects || {}).map(([k2, v]) => k2.replace("_pct", "").replace("_pts", "") + " " + (v > 0 ? "+" : "") + v + (k2.endsWith("_pct") ? "%" : " pkt")).join(", ");
+      if (se) g.append(document.createTextNode(" · " + se));
+      g.append(document.createTextNode(" · punkty: " + (o.points_delta > 0 ? "+" : "") + o.points_delta));
+      el.append(g);
+      if (o.remove) { const r = mk("div", "d rm", "− " + (o.remove.effects || []).slice(0, 2).join("; ")); el.append(r); }
+      if (o.add) { const a = mk("div", "d ad", "+ " + (o.add.effects || []).slice(0, 3).join("; ")); el.append(a); }
+      if (o.reason) el.append(mk("div", "d loss", "odrzucone: " + o.reason));
+    } else el.append(mk("div", "d", "Zaalokowane nody: " + TREE.alloc.size));
+    el.onclick = () => selectOpt(k - 1);
+    list.append(el);
+  });
+}
+
+function selectOpt(i) {
+  sel = i;
+  document.querySelectorAll("#tree-list .opt").forEach(e => e.classList.toggle("active", Number(e.dataset.i) === i));
+  const o = i >= 0 ? TREE.options[i] : null;
+  addSet = new Set(o ? o.added : []); remSet = new Set(o ? o.removed : []);
+  TREE.linkCls = TREE.links.map(([a, b]) => {
+    const st = (id) => remSet.has(id) ? "rem" : addSet.has(id) ? "add" : TREE.alloc.has(id) ? "alloc" : "off";
+    const sa = st(a), sb = st(b);
+    if (sa === "off" || sb === "off") return "off";
+    if (sa === "rem" || sb === "rem") return "rem";
+    if (sa === "add" || sb === "add") return "add";
+    return "alloc";
+  });
+  fitView(!!o);
+}
+
+function sizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  return { w: r.width, h: r.height, dpr };
+}
+
+function fitView(toChanges) {
+  if (!TREE) return;
+  const { w, h } = sizeCanvas();
+  let ids = toChanges && (addSet.size || remSet.size) ? [...addSet, ...remSet] : TREE.nodes.map(n => n.id);
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const id of ids) { const n = TREE.byId.get(id); if (!n) continue; x0 = Math.min(x0, n.x); x1 = Math.max(x1, n.x); y0 = Math.min(y0, n.y); y1 = Math.max(y1, n.y); }
+  if (x0 > x1) return;
+  const changes = toChanges && (addSet.size || remSet.size);
+  const pad = changes ? 700 : 300, bw = Math.max(x1 - x0, 1) + pad * 2, bh = Math.max(y1 - y0, 1) + pad * 2;
+  view = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, s: Math.min(w / bw, h / bh, 0.5) };
+  draw();
+}
+
+// ikony nodów z atlasów PoB (TreeData/<wersja>/sprites.lua + arkusze graficzne); bez nich albo przy małym zbliżeniu rysujemy kółka
+let SPR = null, SPRVER = null; const IMGS = {};
+async function loadSprites(ver) {
+  if (!ver || SPRVER === ver) return;
+  SPRVER = ver; SPR = null;
+  try {
+    const r = await fetch("/api/tree/sprites?version=" + ver); if (!r.ok) return;
+    const d = await r.json();
+    for (const sh of Object.values(d.sheets)) if (!IMGS[ver + sh.file]) { const im = new Image(); im.onload = () => { if (TREE) draw(); }; im.src = "/api/tree/img/" + ver + "/" + sh.file; IMGS[ver + sh.file] = im; }
+    SPR = d; if (TREE) draw();
+  } catch (e) { SPR = null; }
+}
+const SHEET = { N: "normal", T: "notable", K: "keystone" };
+const FRAME = { N: ["PSSkillFrame", "PSSkillFrameActive"], T: ["NotableFrameUnallocated", "NotableFrameAllocated"], K: ["KeystoneFrameUnallocated", "KeystoneFrameAllocated"] };
+function sprite(sheet, key) {
+  const sh = SPR && SPR.sheets[sheet]; if (!sh) return null;
+  const c = sh.coords[key]; const im = IMGS[SPRVER + sh.file];
+  return c && im && im.complete && im.naturalWidth ? { im, c } : null;
+}
+function drawIcon(n, st, x, y) {
+  if (!SPR || !n.ic) return false;
+  const active = st !== "off";
+  let ic, fr = null;
+  if (n.t === "M") ic = sprite(active ? "mastery" : "masteryInactive", n.ic) || sprite("mastery", n.ic);
+  else if (SHEET[n.t]) { ic = sprite(SHEET[n.t] + (active ? "Active" : "Inactive"), n.ic); fr = sprite("frame", FRAME[n.t][active ? 1 : 0]); }
+  else return false;
+  if (!ic) return false;
+  const k = SPR.scale * view.s, sz = Math.max(ic.c.w, ic.c.h) * k;
+  if (sz < 9) return false;
+  ctx.drawImage(ic.im, ic.c.x, ic.c.y, ic.c.w, ic.c.h, x - ic.c.w * k / 2, y - ic.c.h * k / 2, ic.c.w * k, ic.c.h * k);
+  if (fr) ctx.drawImage(fr.im, fr.c.x, fr.c.y, fr.c.w, fr.c.h, x - fr.c.w * k / 2, y - fr.c.h * k / 2, fr.c.w * k, fr.c.h * k);
+  return true;
+}
+
+function draw() {
+  if (!TREE) return;
+  const { w, h, dpr } = sizeCanvas();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = "#0a1012"; ctx.fillRect(0, 0, w, h);
+  const X = (x) => (x - view.x) * view.s + w / 2, Y = (y) => (y - view.y) * view.s + h / 2;
+  const byId = TREE.byId;
+  const lw = { off: 1, alloc: 2, add: 3, rem: 3 };
+  for (const cls of ["off", "alloc", "rem", "add"]) {
+    ctx.beginPath(); ctx.strokeStyle = cls === "off" ? COL.linkOff : COL[cls]; ctx.lineWidth = lw[cls];
+    TREE.links.forEach(([a, b, gx, gy, gr], k) => {
+      if (TREE.linkCls[k] !== cls) return;
+      const A = byId.get(a), B = byId.get(b); if (!A || !B) return;
+      ctx.moveTo(X(A.x), Y(A.y));
+      if (gr) {  // łuk po okręgu grupy (krótszą drogą)
+        const a1 = Math.atan2(A.y - gy, A.x - gx), a2 = Math.atan2(B.y - gy, B.x - gx);
+        let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+        ctx.arc(X(gx), Y(gy), gr * view.s, a1, a2, d < 0);
+      } else ctx.lineTo(X(B.x), Y(B.y));
+    });
+    ctx.stroke();
+  }
+  const state = (id) => remSet.has(id) ? "rem" : addSet.has(id) ? "add" : TREE.alloc.has(id) ? "alloc" : "off";
+  const labels = [];
+  for (const pass of ["off", "alloc", "rem", "add"]) {
+    for (const n of TREE.nodes) {
+      const st = state(n.id); if (st !== pass) continue;
+      const x = X(n.x), y = Y(n.y); if (x < -20 || y < -20 || x > w + 20 || y > h + 20) continue;
+      let r = Math.max(MINPX[n.t] || 1.3, (WR[n.t] || 26) * view.s);
+      if (st === "add" || st === "rem") {
+        r = Math.max(r * 1.5, 4);
+        ctx.beginPath(); ctx.arc(x, y, r + 5, 0, 7); ctx.fillStyle = st === "add" ? "#7fd36b33" : "#e5604a33"; ctx.fill();
+        if (n.t === "T" || n.t === "K") labels.push([x, y, r, n.n, st]);
+      }
+      if (!drawIcon(n, st, x, y)) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = COL[st]; ctx.fill(); }
+    }
+  }
+  ctx.font = "12px system-ui, sans-serif"; ctx.textBaseline = "middle";
+  for (const [x, y, r, name, st] of labels) {
+    const tw = ctx.measureText(name).width;
+    ctx.fillStyle = "#000c"; ctx.fillRect(x + r + 6, y - 9, tw + 8, 18);
+    ctx.fillStyle = st === "add" ? "#9be58a" : "#f08a76"; ctx.fillText(name, x + r + 10, y);
+  }
+}
+
+const TYPE_PL = { N: "Zwykły node", T: "Notable", K: "Keystone", M: "Mastery", S: "Gniazdo na jewel", C: "Start klasy", A: "Start ascendancy" };
+function showTip(n, mx, my, r) {
+  tip.replaceChildren();
+  tip.append(mk("div", "nm", n.n));
+  const st = remSet.has(n.id) ? ["st-rem", "zwolniony w tej zamianie"] : addSet.has(n.id) ? ["st-add", planMode ? "nowy w tym etapie" : "dodany w tej zamianie"] : TREE.alloc.has(n.id) ? ["", "zaalokowany"] : ["", "niezaalokowany"];
+  const tp = mk("div", "tp", TYPE_PL[n.t] + (n.asc ? " · " + n.asc : "") + " · "); tp.append(mk("span", st[0], st[1])); tip.append(tp);
+  (n.d || []).forEach(line => tip.append(mk("div", "ln", line)));
+  tip.style.display = "block";
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = Math.max(4, Math.min(mx + 14, r.width - tw - 4)) + "px";
+  tip.style.top = Math.max(4, Math.min(my + 14, r.height - th - 4)) + "px";
+}
+
+let drag = null;
+cv.addEventListener("mousedown", (e) => { drag = { x: e.clientX, y: e.clientY }; cv.classList.add("drag"); });
+window.addEventListener("mouseup", () => { drag = null; cv.classList.remove("drag"); });
+window.addEventListener("mousemove", (e) => {
+  if (drag && TREE) { view.x -= (e.clientX - drag.x) / view.s; view.y -= (e.clientY - drag.y) / view.s; drag = { x: e.clientX, y: e.clientY }; draw(); }
+});
+cv.addEventListener("mousemove", (e) => {
+  if (!TREE || drag) { tip.style.display = "none"; return; }
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const wx = (mx - r.width / 2) / view.s + view.x, wy = (my - r.height / 2) / view.s + view.y;
+  let best = null, bd = (14 / view.s) ** 2;
+  for (const n of TREE.nodes) { const d = (n.x - wx) ** 2 + (n.y - wy) ** 2; if (d < bd) { bd = d; best = n; } }
+  if (best && best.n) showTip(best, mx, my, r); else tip.style.display = "none";
+});
+cv.addEventListener("wheel", (e) => {
+  if (!TREE) return; e.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const wx = (mx - r.width / 2) / view.s + view.x, wy = (my - r.height / 2) / view.s + view.y;
+  view.s = Math.min(Math.max(view.s * (e.deltaY < 0 ? 1.18 : 1 / 1.18), 0.01), 1.2);
+  view.x = wx - (mx - r.width / 2) / view.s; view.y = wy - (my - r.height / 2) / view.s; draw();
+}, { passive: false });
+window.addEventListener("resize", () => { if ($("tree-modal").classList.contains("open")) draw(); });
+
+
+// ---------------------------------------------------------------- plan rozwoju: etapy drzewka z edycją
+let PLAN = null, STAGES = [], planMode = false, freeMode = false, pdone = 0, ssel = 0, ADJ = null, evalSeq = 0;
+function toast(t) { let e = $("toast"); if (!e) { e = document.createElement("div"); e.id = "toast"; document.body.appendChild(e); } e.textContent = t; e.classList.add("on"); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove("on"), 4500); }
+function bindChips() { document.querySelectorAll("#chips .chip").forEach(c => { c.onclick = () => { $("q").value = c.textContent; $("q").focus(); }; c.onkeydown = (e) => { if (e.key === "Enter") c.click(); }; }); }
+
+const nodesPl = (n) => n === 1 ? "1 node" : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 > 20)) ? n + " nody" : n + " nodów";
+const STAT_PL = { CombinedDPS: "DPS", Life: "życie", EnergyShield: "ES", TotalEHP: "EHP" };
+const isAscNode = (id) => { const n = TREE.byId.get(id); return !!(n && n.asc); };
+const stageNodes = (i) => new Set(STAGES[i].nodes);
+const countPts = (set) => { let m = 0, a = 0; set.forEach(id => { const n = TREE.byId.get(id); if (!n || n.t === "C" || n.t === "A") return; if (n.asc) a++; else m++; }); return [m, a]; };
+
+function buildAdj() {
+  ADJ = new Map();
+  TREE.links.forEach(([a, b]) => { (ADJ.get(a) || ADJ.set(a, []).get(a)).push(b); (ADJ.get(b) || ADJ.set(b, []).get(b)).push(a); });
+}
+// najkrótsza ścieżka od zaalokowanych nodów do celu (tylko w obrębie głównego drzewka albo tej samej ascendancy)
+function pathTo(target, alloc) {
+  const tgt = TREE.byId.get(target); if (!tgt || alloc.has(target)) return [];
+  const pool = tgt.asc || "";
+  const ok = (id) => { const n = TREE.byId.get(id); if (!n || (n.asc || "") !== pool) return false; if (n.t === "C" || n.t === "A") return alloc.has(id); if (n.t === "M") return id === target; return true; };
+  const prev = new Map(), q = [];
+  alloc.forEach(id => { const n = TREE.byId.get(id); if (n && (n.asc || "") === pool) { prev.set(id, null); q.push(id); } });
+  for (let h = 0; h < q.length; h++) {
+    const cur = q[h];
+    for (const nb of ADJ.get(cur) || []) {
+      if (prev.has(nb) || !ok(nb)) continue;
+      prev.set(nb, cur);
+      if (nb === target) { const out = []; for (let x = nb; x !== null && !alloc.has(x); x = prev.get(x)) out.push(x); return out.reverse(); }
+      if (TREE.byId.get(nb).t !== "M") q.push(nb);
+    }
+  }
+  return null;
+}
+// po zwolnieniu nodu zostaje tylko to, co dalej łączy się ze startem klasy/ascendancy
+function prune(set) {
+  const seen = new Set(), q = [];
+  TREE.base.forEach(id => { seen.add(id); q.push(id); });
+  for (let h = 0; h < q.length; h++) for (const nb of ADJ.get(q[h]) || []) {
+    if (seen.has(nb) || !set.has(nb)) continue;
+    seen.add(nb); if (TREE.byId.get(nb).t !== "M") q.push(nb);
+  }
+  return new Set([...set].filter(id => seen.has(id)));
+}
+
+function applyStage() {
+  const st = STAGES[ssel], cur = stageNodes(ssel), prevSet = ssel > 0 ? stageNodes(ssel - 1) : new Set();
+  TREE.alloc = new Set([...TREE.base, ...cur]);
+  addSet = new Set([...cur].filter(id => !prevSet.has(id)));
+  remSet = new Set([...prevSet].filter(id => !cur.has(id)));
+  planLinks();
+}
+function planLinks() {
+  TREE.linkCls = TREE.links.map(([a, b]) => {
+    const s = (id) => remSet.has(id) ? "rem" : addSet.has(id) ? "add" : TREE.alloc.has(id) ? "alloc" : "off";
+    const sa = s(a), sb = s(b);
+    if (sa === "off" || sb === "off") return "off";
+    if (sa === "rem" || sb === "rem") return "rem";
+    return sa === "add" || sb === "add" ? "add" : "alloc";
+  });
+}
+
+function statLine(s) { return s ? "DPS " + fmt(s.CombinedDPS || 0) + " · życie " + fmt(s.Life || 0) + " · EHP " + fmt(s.TotalEHP || 0) : ""; }
+function resLine(s) { return s ? "res " + [s.FireResist, s.ColdResist, s.LightningResist].map(v => Math.round(v || 0)).join("/") : ""; }
+
+function buildPlanList() {
+  const list = $("tree-list"); list.innerHTML = "";
+  const head = mk("div", "opt"); head.style.cursor = "default";
+  head.append(mk("div", "t", PLAN.skill + " · " + (PLAN.ascendancy !== "None" ? PLAN.ascendancy : PLAN.class)));
+  head.append(mk("div", "d", "Etapy planu: wybierz etap, a drzewko pokaże stan na jego koniec. Kliknij node na drzewku, żeby go wziąć (ze ścieżką) albo zwolnić; PoB przelicza etap od razu."));
+  if (PLAN.damage_type) head.append(mk("div", "d", "Typ obrażeń (z danych skilla): " + PLAN.damage_type));
+  if (PLAN.budget_chaos != null) head.append(mk("div", "d", "Budżet gemów: " + PLAN.budget_chaos + " c, wydane: " + PLAN.spent_gems_chaos + " c (ceny poe.ninja)"));
+  const lab = mk("label", "d"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = "propagate"; cb.checked = true; lab.append(cb, document.createTextNode(" stosuj zmianę też do kolejnych etapów")); head.append(lab);
+  list.append(head);
+  STAGES.forEach((st, i) => {
+    const sec = (PLAN.sections || [])[i] || {}, set = stageNodes(i), [m, a] = countPts(set);
+    const over = m > st.points_total || a > st.asc_total;
+    const el = mk("div", "opt" + (i === ssel ? " active" : "") + (i < pdone ? " donegrp" : "")); el.dataset.i = i;
+    el.append(mk("div", "t", (i < pdone ? "✓ " : "") + st.name + " · lvl " + st.level));
+    const pts = mk("div", "d", "Punkty: " + m + "/" + st.points_total + (a || st.asc_total ? " · ascendancy " + a + "/" + st.asc_total : "")
+      + (st.quest_points ? " · +" + st.quest_points + " z questów tego aktu" : "")); if (over) pts.style.color = "#e5604a"; el.append(pts);
+    el.append(mk("div", "d", statLine(st.stats) + " · " + resLine(st.stats)));
+    if (i === ssel) {
+      if (sec.quests && sec.quests.length) el.append(mk("div", "d", "Questy: " + sec.quests.map(q => q.name + (q.points > 1 ? " ×" + q.points : "")).join(", ")));
+      el.append(mk("div", "d", "Link " + (sec.links || 1) + "L: " + PLAN.skill + ((sec.supports || []).length ? " + " + sec.supports.map(x => x.name + " (+" + x.contribution_pct + "%)").join(", ") : "")));
+      (sec.support_log || []).filter(x => x.note).forEach(x => el.append(mk("div", "d", x.note)));
+      const w = (sec.gear || []).find(x => x.slot === "Weapon 1");
+      if (w) el.append(mk("div", "d", "Broń: " + w.base + " (ilvl " + w.ilvl + "): " + w.mods.map(x => x.mod).join("; ")));
+      const rest = (sec.gear || []).filter(x => x.slot !== "Weapon 1");
+      if (rest.length) { const det = document.createElement("details"); const sm = document.createElement("summary"); sm.textContent = "Reszta ekwipunku poglądowego"; det.append(sm);
+        rest.forEach(x => det.append(mk("div", "d", x.slot + " – " + x.base + ": " + x.mods.map(y => y.mod).join("; ")))); el.append(det); }
+      const news = [...addSet].map(id => TREE.byId.get(id)).filter(n => n && (n.t === "T" || n.t === "K" || n.t === "M"));
+      const hd = mk("div", "t", "Nowe w tym etapie: " + nodesPl(addSet.size)); hd.style.marginTop = "8px"; el.append(hd);
+      news.forEach(n => { const row = mk("div", "d ad", (n.t === "K" ? "Keystone " : n.t === "M" ? "Mastery " : "") + n.n + ((n.d || []).length ? ": " + n.d.slice(0, 2).join("; ") : "")); row.style.cursor = "pointer";
+        row.onclick = (ev) => { ev.stopPropagation(); view.x = n.x; view.y = n.y; view.s = Math.max(view.s, 0.12); draw(); }; el.append(row); });
+      if (remSet.size) el.append(mk("div", "d rm", "Zwolnione względem poprzedniego etapu: " + nodesPl(remSet.size)));
+      const bar = mk("div", "d"); bar.style.marginTop = "8px";
+      const reset = document.createElement("button"); reset.type = "button"; reset.textContent = "Przywróć wersję planera";
+      reset.onclick = (ev) => { ev.stopPropagation(); resetStages(); }; bar.append(reset);
+      const done = document.createElement("button"); done.type = "button"; done.textContent = "Etap ukończony"; done.style.marginLeft = "8px";
+      done.onclick = async (ev) => { ev.stopPropagation(); const r = await (await fetch("/api/plan/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ done: ssel + 1 }) })).json(); pdone = r.done; buildPlanList(); }; bar.append(done);
+      el.append(bar);
+    }
+    el.onclick = () => selectStage(i);
+    list.append(el);
+  });
+}
+
+function selectStage(i, keepView) {
+  ssel = i; applyStage(); buildPlanList();
+  if (!keepView) fitView(addSet.size > 0);
+  if (!addSet.size && !keepView) fitView(false); else draw();
+  $("tree-msg").textContent = "";
+}
+
+async function postEval(stages, extra) {
+  const r = await fetch("/api/plan/eval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stages, ...extra }) });
+  const j = await r.json(); if (!r.ok) throw new Error(j.detail || "błąd przeliczenia");
+  return j.results;
+}
+async function resetStages() {
+  $("tree-msg").textContent = "przywracam…";
+  try {
+    const res = await postEval(STAGES.map((_, i) => ({ stage: i, nodes: [], masteries: {} })), { reset: true });
+    const r = await (await fetch("/api/plan")).json(); PLAN = r.plan; STAGES = PLAN.stages;
+    selectStage(ssel, true); $("tree-msg").textContent = "";
+  } catch (e) { $("tree-msg").textContent = e.message; }
+}
+
+// edycja: klik w node na drzewku w trybie planu
+async function editNode(id) {
+  const n = TREE.byId.get(id); if (!n || n.t === "C" || n.t === "A") return;
+  const cur = stageNodes(ssel), mast = { ...(STAGES[ssel].masteries || {}) };
+  const before = new Set(cur);
+  if (cur.has(id)) {
+    const after = prune(new Set([...TREE.base, ...[...cur].filter(x => x !== id)]));
+    const removed = [...cur].filter(x => !after.has(x));
+    removed.forEach(x => { cur.delete(x); delete mast[x]; });
+    toast("Zwolniono: " + removed.map(x => TREE.byId.get(x).n || "node").slice(0, 4).join(", ") + (removed.length > 4 ? " … (" + removed.length + " nodów)" : ""));
+    commitEdit(before, cur, mast);
+  } else if (n.t === "M") {
+    const p = pathTo(id, new Set([...TREE.base, ...cur]));
+    if (!p) { toast("Do tego nodu nie ma ścieżki z obecnego drzewka."); return; }
+    pickMastery(n, (eff) => { p.forEach(x => cur.add(x)); mast[id] = eff; commitEdit(before, cur, mast); });
+  } else {
+    const p = pathTo(id, new Set([...TREE.base, ...cur]));
+    if (!p) { toast("Do tego nodu nie ma ścieżki z obecnego drzewka."); return; }
+    p.forEach(x => cur.add(x));
+    toast("Wzięto: " + n.n + (p.length > 1 ? " (+" + (p.length - 1) + " nodów ścieżki)" : ""));
+    commitEdit(before, cur, mast);
+  }
+}
+function pickMastery(n, cb) {
+  let box = $("mastery-pick"); if (box) box.remove();
+  box = mk("div", ""); box.id = "mastery-pick";
+  box.style.cssText = "position:absolute;right:14px;top:14px;z-index:5;background:#050a0bf5;border:1px solid var(--line2);border-radius:4px;padding:10px;max-width:420px;max-height:70%;overflow:auto";
+  box.append(mk("div", "t", n.n + ": wybierz efekt"));
+  const used = new Set(Object.values(STAGES[ssel].masteries || {}));
+  (n.me || []).forEach(o => { const b = mk("div", "opt", (o.s || []).join(" / ")); if (used.has(o.e)) { b.style.opacity = ".45"; b.title = "ten efekt jest już użyty na innym masteries"; }
+    b.onclick = () => { box.remove(); cb(o.e); }; box.append(b); });
+  const x = document.createElement("button"); x.type = "button"; x.textContent = "Anuluj"; x.onclick = () => box.remove(); box.append(x);
+  $("tree-wrap").append(box);
+}
+async function commitEdit(before, cur, mast) {
+  const added = [...cur].filter(x => !before.has(x)), removed = [...before].filter(x => !cur.has(x));
+  const changed = [{ stage: ssel, nodes: [...cur], masteries: mast }];
+  if ($("propagate") && $("propagate").checked) {
+    for (let j = ssel + 1; j < STAGES.length; j++) {
+      let s = stageNodes(j); added.forEach(x => s.add(x)); removed.forEach(x => s.delete(x));
+      s = prune(new Set([...TREE.base, ...s])); [...TREE.base].forEach(x => s.delete(x));
+      const m = { ...(STAGES[j].masteries || {}) }; removed.forEach(x => delete m[x]); Object.keys(mast).forEach(k => { if (cur.has(Number(k)) && !(k in m)) m[k] = mast[k]; });
+      changed.push({ stage: j, nodes: [...s], masteries: m });
+    }
+  }
+  changed.forEach(c => { STAGES[c.stage].nodes = c.nodes; STAGES[c.stage].masteries = c.masteries; });
+  if (freeMode) { applyStage(); buildFreeList(); draw(); return; }
+  applyStage(); buildPlanList(); draw();
+  const seq = ++evalSeq; $("tree-msg").textContent = "PoB przelicza…";
+  try {
+    const res = await postEval(changed, { save: true });
+    if (seq !== evalSeq) return;
+    res.forEach(r => { STAGES[r.stage].stats = r.stats; });
+    buildPlanList(); $("tree-msg").textContent = "zapisano";
+  } catch (e) { $("tree-msg").textContent = e.message; }
+}
+cv.addEventListener("mousedown", (e) => { cv._down = { x: e.clientX, y: e.clientY }; });
+cv.addEventListener("click", (e) => {
+  if (!planMode || !TREE || !cv._down || Math.hypot(e.clientX - cv._down.x, e.clientY - cv._down.y) > 5) return;
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const wx = (mx - r.width / 2) / view.s + view.x, wy = (my - r.height / 2) / view.s + view.y;
+  let best = null, bd = (14 / view.s) ** 2;
+  for (const n of TREE.nodes) { const d = (n.x - wx) ** 2 + (n.y - wy) ** 2; if (d < bd) { bd = d; best = n; } }
+  if (best) editNode(best.id);
+});
+
+// własne drzewko bez wczytanego buildu: wybór klasy i ascendancy, klik = weź/zwolnij node ze ścieżką
+async function openFree(cls, asc) {
+  leavePlanMode(); freeMode = true;
+  $("tree-modal").classList.add("open"); $("tree-msg").textContent = "ładuję drzewko…";
+  try {
+    const r = await fetch("/api/tree/free?cls=" + encodeURIComponent(cls || "Marauder") + "&asc=" + encodeURIComponent(asc || "None")), d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "błąd");
+    TREE = d; loadSprites(d.tree_version); TREE.byId = new Map(d.nodes.map(n => [n.id, n])); TREE.base = new Set(d.base); buildAdj();
+    PLAN = { skill: "", class: d.cls, ascendancy: d.asc, sections: [] };
+    STAGES = [{ name: "Własne drzewko", level: 100, points_total: 123, asc_total: 8, quest_points: 0, nodes: [], masteries: {}, stats: null }];
+    ssel = 0; planMode = true; pdone = 0;
+    const cs = $("free-cls"), as = $("free-asc");
+    cs.replaceChildren(...d.classes.map(c => { const o = mk("option", "", c.name); o.value = c.name; return o; })); cs.value = d.cls;
+    const ac = d.classes.find(c => c.name === d.cls).asc;
+    as.replaceChildren(...ac.map(a => { const o = mk("option", "", a === "None" ? "bez ascendancy" : a); o.value = a; return o; })); as.value = d.asc;
+    ["free-cls", "free-asc", "free-code", "free-clear"].forEach(i => $(i).hidden = false);
+    $("plan-done").hidden = true; $("plan-code").hidden = true; $("plan-guide").hidden = true;
+    $("tree-legend").innerHTML = '<i style="background:#c8a45c"></i>wzięte<i style="background:#7fd36b"></i>dodane przed chwilą<i style="background:#33464b"></i>reszta · klik = weź/zwolnij node';
+    applyStage(); buildFreeList(); fitView(false); $("tree-msg").textContent = "";
+  } catch (e) { $("tree-msg").textContent = e.message; }
+}
+$("free-cls").onchange = () => openFree($("free-cls").value, "None");
+$("free-asc").onchange = () => openFree($("free-cls").value, $("free-asc").value);
+$("free-clear").onclick = () => { STAGES[0].nodes = []; STAGES[0].masteries = {}; applyStage(); buildFreeList(); draw(); };
+$("free-code").onclick = async () => {
+  const st = STAGES[0];
+  const r = await fetch("/api/tree/code", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cls: PLAN.class, asc: PLAN.ascendancy, nodes: st.nodes, masteries: st.masteries }) });
+  if (!r.ok) { toast((await r.json()).detail || "Nie udało się zbudować kodu."); return; }
+  toast((await copyText((await r.json()).code)) ? "Skopiowano kod PoB drzewka. W PoB: Import/Export → Import from code." : "Nie udało się skopiować do schowka.");
+};
+function buildFreeList() {
+  const list = $("tree-list"); list.innerHTML = "";
+  const set = stageNodes(0), [m, a] = countPts(set);
+  const head = mk("div", "opt"); head.style.cursor = "default";
+  head.append(mk("div", "t", PLAN.class + (PLAN.ascendancy !== "None" ? " · " + PLAN.ascendancy : "")));
+  head.append(mk("div", "d", "Punkty: " + m + "/123 · ascendancy " + a + "/8"));
+  head.append(mk("div", "d", "Kliknij node, żeby go wziąć (ze ścieżką) albo zwolnić. Bez buildu nie ma przeliczania statystyk: do liczb wczytaj kod PoB albo poproś o plan rozwoju."));
+  list.append(head);
+  [...set].map(id => TREE.byId.get(id)).filter(n => n && (n.t === "T" || n.t === "K" || n.t === "M")).forEach(n => {
+    const row = mk("div", "opt"); row.append(mk("div", "t", (n.t === "K" ? "Keystone " : n.t === "M" ? "Mastery " : "") + n.n));
+    row.append(mk("div", "d", ((n.t === "M" && STAGES[0].masteries[n.id] != null ? (n.me || []).filter(o => o.e === STAGES[0].masteries[n.id]).flatMap(o => o.s) : n.d) || []).slice(0, 3).join("; ")));
+    row.onclick = () => { view.x = n.x; view.y = n.y; view.s = Math.max(view.s, 0.12); draw(); }; list.append(row);
+  });
+}
+
+async function openPlan() {
+  $("tree-modal").classList.add("open"); $("tree-msg").textContent = "ładuję plan…";
+  try {
+    const r = await (await fetch("/api/plan")).json();
+    if (!r.plan) { $("tree-list").innerHTML = ""; $("tree-msg").textContent = "Nie ma jeszcze planu. Poproś w czacie o plan rozwoju postaci."; return; }
+    if (!r.plan.stages || !r.plan.stages.length) { $("tree-list").innerHTML = ""; $("tree-msg").textContent = "Ten plan jest ze starej wersji (bez etapów). Wygeneruj go jeszcze raz."; return; }
+    const l = await fetch("/api/plan/layout"), d = await l.json();
+    TREE = d; loadSprites(d.tree_version); TREE.byId = new Map(d.nodes.map(n => [n.id, n])); PLAN = r.plan; STAGES = PLAN.stages; pdone = r.done; planMode = true;
+    TREE.base = new Set(d.base || []); buildAdj();
+    $("plan-done").hidden = true; $("plan-code").hidden = false; $("plan-guide").hidden = false;
+    $("tree-legend").innerHTML = '<i style="background:#c8a45c"></i>wzięte<i style="background:#7fd36b"></i>nowe w etapie<i style="background:#e5604a"></i>zwolnione<i style="background:#33464b"></i>reszta · klik = weź/zwolnij node';
+    selectStage(Math.min(pdone, STAGES.length - 1));
+  } catch (e) { $("tree-msg").textContent = e.message; }
+}
+$("open-plan").onclick = openPlan;
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {
+    const a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select();
+    try { return document.execCommand("copy"); } finally { a.remove(); }
+  }
+}
+$("plan-code").onclick = async () => {
+  const r = await fetch("/api/plan/code/" + ssel);
+  if (!r.ok) { toast((await r.json()).detail || "Nie udało się zbudować kodu."); return; }
+  const ok = await copyText((await r.json()).code);
+  toast(ok ? "Skopiowano kod PoB etapu: " + STAGES[ssel].name + ". W PoB: Import/Export → Import from code." : "Nie udało się skopiować do schowka.");
+};
+let GUIDE_MD = "";
+function mdHtml(md) {
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inl = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+  let out = "", ul = false, code = false;
+  for (const ln of md.split("\n")) {
+    if (ln.startsWith("```")) { out += code ? "</pre>" : "<pre>"; code = !code; continue; }
+    if (code) { out += esc(ln) + "\n"; continue; }
+    const li = ln.startsWith("- ");
+    if (ul && !li) { out += "</ul>"; ul = false; }
+    if (li) { if (!ul) { out += "<ul>"; ul = true; } out += "<li>" + inl(ln.slice(2)) + "</li>"; }
+    else if (ln.startsWith("### ")) out += "<h3>" + inl(ln.slice(4)) + "</h3>";
+    else if (ln.startsWith("## ")) out += "<h2>" + inl(ln.slice(3)) + "</h2>";
+    else if (ln.startsWith("# ")) out += "<h1>" + inl(ln.slice(2)) + "</h1>";
+    else if (ln.trim()) out += "<p>" + inl(ln) + "</p>";
+  }
+  return out + (ul ? "</ul>" : "");
+}
+$("plan-guide").onclick = async () => {
+  $("guide-body").textContent = "buduję poradnik…"; $("guide-modal").classList.add("open");
+  const r = await fetch("/api/plan/guide");
+  if (!r.ok) { $("guide-body").textContent = (await r.json()).detail || "Błąd."; return; }
+  GUIDE_MD = (await r.json()).markdown; $("guide-body").innerHTML = mdHtml(GUIDE_MD);
+};
+$("guide-close").onclick = () => $("guide-modal").classList.remove("open");
+$("guide-copy").onclick = async () => toast((await copyText(GUIDE_MD)) ? "Skopiowano poradnik." : "Nie udało się skopiować.");
+
+// ---------------------------------------------------------------- ceny (trade)
+const PR = { filters: [], lastId: null, item: null };
+const chaosTxt = (v) => v == null ? "?" : (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + "c";
+function openPane(id) { document.querySelectorAll(".pane.open").forEach(p => p.classList.remove("open")); $(id).classList.add("open"); }
+async function prLeagues() {
+  try {
+    const d = await (await fetch("/api/price/league")).json(), sel = $("pr-league");
+    sel.innerHTML = (d.leagues.length ? d.leagues : [d.league]).map(l => `<option ${l === d.league ? "selected" : ""}>${esc(l)}</option>`).join("");
+  } catch (e) { /* liga zostaje z poprzedniej wartości */ }
+}
+$("pr-league").onchange = async () => { await fetch("/api/price/league", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ league: $("pr-league").value }) }); };
+function prRender(d) {
+  const it = d.item;
+  $("pr-item").innerHTML = `<div class="itemcard"><div class="nm">${esc(it.name || it.base)}</div><div class="muted">${esc(it.rarity || "")} ${esc(it.base && it.name ? it.base : "")}${it.ilvl ? " · ilvl " + it.ilvl : ""}${it.links > 4 ? " · " + it.links + "L" : ""}</div></div>`;
+  PR.filters = d.filters;
+  const box = $("pr-filters"); box.innerHTML = "";
+  d.filters.forEach((f, i) => {
+    const r = document.createElement("div"); r.className = "flt" + (f.enabled ? "" : " off");
+    r.innerHTML = `<input type="checkbox" ${f.enabled ? "checked" : ""} ${f.id ? "" : "disabled"} aria-label="użyj filtra"><span title="${f.id ? "" : "brak odpowiednika na trade"}">${esc(f.text)}${f.kind !== "explicit" ? ` <i class="muted">(${esc(f.kind)})</i>` : ""}</span><input type="number" value="${f.min ?? ""}" ${f.id ? "" : "disabled"} aria-label="minimum">`;
+    r.children[0].onchange = (e) => { f.enabled = e.target.checked; r.classList.toggle("off", !f.enabled); };
+    r.children[2].onchange = (e) => { f.min = e.target.value === "" ? null : parseFloat(e.target.value); };
+    box.append(r);
+  });
+  $("pr-refine").hidden = !d.filters.length;
+  const rows = d.listings.map(l => `<tr><td class="num"><b>${esc(l.price_text)}</b>${l.currency !== "chaos" && l.price_chaos != null ? `<div class="muted">≈ ${chaosTxt(l.price_chaos)}</div>` : ""}</td>
+    <td><span class="dot ${l.online ? "on" : ""}"></span>${esc(l.account || "?")}</td><td class="muted">${esc((l.mods || []).slice(0, 4).join(" · "))}</td>
+    <td><button class="small" type="button" data-w="${esc(l.whisper || "")}">Kopiuj wiadomość</button></td></tr>`).join("");
+  $("pr-main").innerHTML = `<div class="sum"><div>ofert<b>${d.total}</b></div><div>najniższa<b>${chaosTxt(d.min_chaos)}</b></div><div>mediana (z ${d.listings.length})<b>${chaosTxt(d.median_chaos)}</b></div><div>liga<b style="font-size:14px">${esc(d.league)}</b></div></div>
+    <div class="row"><button type="button" id="pr-web">Otwórz na stronie trade</button></div>
+    ${rows ? `<table class="tbl"><thead><tr><th>Cena</th><th>Sprzedawca</th><th>Mody</th><th></th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="muted">Brak ofert dla tych filtrów. Zmniejsz podobieństwo albo odznacz część modów.</p>`}`;
+  $("pr-main").querySelectorAll("button[data-w]").forEach(b => b.onclick = async () => toast((await copyText(b.dataset.w)) ? "Skopiowano wiadomość do sprzedawcy." : "Nie udało się skopiować."));
+  $("pr-web").onclick = () => fetch("/api/open_url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: d.trade_url }) });
+}
+async function prCheck(useFilters) {
+  const text = $("pr-text").value.trim(); if (!text) { toast("Wklej item albo naciśnij Ctrl+D w grze."); return; }
+  const overrides = {};
+  if (useFilters) PR.filters.forEach(f => { if (f.id) overrides[f.id] = { enabled: !!f.enabled, min: f.min }; });
+  $("pr-main").innerHTML = `<p class="muted">Szukam ofert…</p>`; $("pr-go").disabled = $("pr-again").disabled = true;
+  try {
+    const r = await fetch("/api/price/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, status: $("pr-status").value, min_pct: (parseFloat($("pr-pct").value) || 90) / 100, overrides }) });
+    const d = await r.json();
+    if (!r.ok) { $("pr-main").innerHTML = `<p class="loss">${esc(d.detail || "Błąd")}</p>`; }
+    else prRender(d);
+  } catch (e) { $("pr-main").innerHTML = `<p class="loss">Brak połączenia z serwerem: ${esc(e.message)}</p>`; }
+  $("pr-go").disabled = $("pr-again").disabled = false;
+}
+$("pr-go").onclick = () => prCheck(false);
+$("pr-again").onclick = () => prCheck(true);
+$("pr-close").onclick = () => $("price-pane").classList.remove("open");
+$("open-price").onclick = () => { openPane("price-pane"); prLeagues(); };
+// skrót Ctrl+D w grze: serwer zapamiętuje item i sam go wycenia; okno główne tylko pokazuje wynik (gdy nie działa nakładka)
+async function pollCapture() {
+  try {
+    const c = await (await fetch("/api/price/last")).json();
+    if (PR.lastId === null) { PR.lastId = c.id; return; }
+    if (c.id !== PR.lastId) {
+      PR.lastId = c.id; PR.waiting = !c.overlay; $("pr-text").value = c.text;
+      if (PR.waiting) { openPane("price-pane"); prLeagues(); $("pr-main").innerHTML = `<p class="muted">Szukam ofert…</p>`; }
+    }
+    if (PR.waiting && c.id === PR.lastId && c.status === "done") { PR.waiting = false; prRender(c.result); }
+    else if (PR.waiting && c.id === PR.lastId && c.status === "error") { PR.waiting = false; $("pr-main").innerHTML = `<p class="loss">${esc(c.error || "Błąd")}</p>`; }
+  } catch (e) { /* serwer chwilowo niedostępny */ }
+}
+setInterval(pollCapture, 800);
+
+// ---------------------------------------------------------------- klejnoty
+const JW = { data: null, tab: 1, goal: "damage" };
+const pctTxt = (v) => v == null ? "?" : (v > 0 ? "+" : "") + v.toFixed(2) + "%";
+const clsDelta = (v) => v > 0.05 ? "gain" : v < -0.05 ? "loss" : "";
+const TL_TYPES = ["Glorious Vanity", "Lethal Pride", "Brutal Restraint", "Militant Faith", "Elegant Hubris"];
+const TL_CONQ = [["Doryani", "Xibaqua", "Ahuana"], ["Kaom", "Rakiata", "Akoya"], ["Asenath", "Nasima", "Balbala"], ["Avarius", "Dominus", "Maxarius"], ["Cadiro", "Victario", "Caspiro"]];
+async function jwLoad() {
+  $("jw-msg").textContent = "wczytuję…";
+  const r = await fetch("/api/jewels"), d = await r.json();
+  $("jw-msg").textContent = "";
+  if (!r.ok) { $("jw-main").innerHTML = `<p class="loss">${esc(d.detail || "Błąd")}</p>`; $("jw-side").innerHTML = ""; return false; }
+  JW.data = d; return true;
+}
+const jwGoalSel = () => `<label class="f">Cel<select id="jw-goal"><option value="damage">Obrażenia</option><option value="balanced">Zbalansowany</option><option value="defence">Obrona</option></select></label>`;
+const socketLabel = (s) => `${s.id} · przy ${s.near}${s.alloc ? "" : ` · niezaalokowany (+${s.dist ?? "?"} pkt)`}`;
+function jwSockets() {
+  const d = JW.data;
+  $("jw-side").innerHTML = jwGoalSel() + `<div class="muted">Zamiana i próby liczą się w Path of Building na Twoim buildzie, bez zapisywania, dopóki nie klikniesz „Zostaw w buildzie”.</div>
+    <div class="sec">Wypróbuj jewel</div>
+    <label class="f">Socket<select id="jw-sock">${d.sockets.map(s => `<option value="${s.id}">${esc(socketLabel(s))}</option>`).join("")}</select></label>
+    <label class="f">Tekst jewela (Ctrl+C w grze)<textarea id="jw-text" rows="7"></textarea></label>
+    <div class="row"><button id="jw-try" class="primary" type="button">Policz</button></div><div id="jw-res"></div>`;
+  $("jw-goal").value = JW.goal; $("jw-goal").onchange = (e) => JW.goal = e.target.value;
+  const rows = d.sockets.map(s => {
+    const it = s.item;
+    const tl = it && it.timeless ? ` <i class="muted">(seed ${it.timeless.seed}, ${esc(it.timeless.conqueror)})</i>` : "";
+    return `<tr><td class="num">${s.id}</td><td>${esc(s.near)}</td><td>${s.alloc ? "zaalokowany" : `<span class="muted">+${s.dist ?? "?"} pkt</span>`}</td>
+      <td>${it ? `<b>${esc(it.name || it.base)}</b>${tl}<div class="muted">${esc((it.mods || []).slice(0, 4).join(" · "))}</div>` : `<span class="muted">pusty</span>`}</td>
+      <td><select data-swap="${s.id}" class="small"><option value="">zamień z…</option>${d.sockets.filter(o => o.id !== s.id && (s.item || o.item)).map(o => `<option value="${o.id}">${o.id} (${esc(o.near)})</option>`).join("")}</select></td></tr>`;
+  }).join("");
+  const spare = d.spare.length ? `<div class="sec">Jewele poza socketami</div>` + d.spare.map(i => `<div class="muted">${esc(i.name || i.base)}: ${esc((i.mods || []).slice(0, 3).join(" · "))}</div>`).join("") : "";
+  $("jw-main").innerHTML = `<table class="tbl"><thead><tr><th>Socket</th><th>Okolica</th><th>Stan</th><th>Jewel</th><th></th></tr></thead><tbody>${rows}</tbody></table>${spare}<div id="jw-out"></div>`;
+  $("jw-main").querySelectorAll("select[data-swap]").forEach(sel => sel.onchange = async () => {
+    if (!sel.value) return; const a = +sel.dataset.swap, b = +sel.value; sel.value = "";
+    await jwRun("/api/jewels/swap", { a, b, goal: JW.goal, alloc: true }, `Zamiana socketów ${a} ↔ ${b}`);
+  });
+  $("jw-try").onclick = () => jwRun("/api/jewels/try", { socket: +$("jw-sock").value, text: $("jw-text").value, goal: JW.goal, alloc: true }, "Wynik jewela");
+}
+async function jwRun(url, body, title, extra) {
+  $("jw-msg").textContent = "liczę w PoB…";
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }), d = await r.json();
+  $("jw-msg").textContent = "";
+  const out = $("jw-out") || $("jw-res");
+  if (!r.ok) { out.innerHTML = `<p class="loss">${esc(d.detail || "Błąd")}</p>`; return; }
+  const se = Object.entries(d.side_effects || {}).map(([k, v]) => `${k.replace("_pct", "")} ${k.endsWith("_pts") ? v + " pkt" : pctTxt(v)}`).join(", ");
+  const viol = (d.floor_violations || []).length ? `<div class="loss">Uwaga: ${esc(d.floor_violations.join("; "))}</div>` : "";
+  out.innerHTML = `<div class="itemcard"><div class="nm">${esc(title)}</div><div>${esc(d.metric)}: <b class="${clsDelta(d.delta_pct)}">${pctTxt(d.delta_pct)}</b>${se ? ` <span class="muted">· ${esc(se)}</span>` : ""}</div>${viol}
+    <div class="row" style="margin-top:8px"><button type="button" class="small" id="jw-apply">Zostaw w buildzie</button></div></div>`;
+  $("jw-apply").onclick = async () => { const r2 = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, apply: true }) }); toast(r2.ok ? "Zmiana zapisana w sesji buildu." : "Nie udało się zapisać."); if (r2.ok && await jwLoad()) jwSockets(); };
+}
+function jwTimeless() {
+  const d = JW.data;
+  const opts = d.sockets.map(s => `<option value="${s.id}">${esc(socketLabel(s))}</option>`).join("");
+  $("jw-side").innerHTML = `<label class="f">Jewel<select id="tl-type">${TL_TYPES.map((n, i) => `<option value="${i + 1}">${n}</option>`).join("")}</select></label>
+    <label class="f">Conqueror<select id="tl-conq"></select></label>
+    <label class="f">Socket<select id="tl-sock">${opts}</select></label>
+    <label class="f">Szukane staty (po angielsku, jedna linia = fraza; opcjonalnie „; waga”)<textarea id="tl-want" rows="6" placeholder="critical strike chance; 2&#10;increased spell damage&#10;maximum life"></textarea></label>
+    ${jwGoalSel()}
+    <label class="row muted"><input type="checkbox" id="tl-price"> sprawdź ceny na trade (najtańsze oferty)</label>
+    <label class="f">Sortowanie wyników z cenami<select id="tl-sort"><option value="value">najlepszy zysk za chaosa</option><option value="cheap">najtańsze z dużym zyskiem</option><option value="gain">największy zysk</option></select></label>
+    <div class="row"><button id="tl-go" class="primary" type="button">Szukaj seedów</button></div>
+    <div class="muted">Skanuję wszystkie seedy wybranego jewela na danych PoB, a najlepsze liczę pełnym kalkulatorem na Twoim buildzie. Gdy jest jeden socket zaalokowany, jest używany jako pierwszy.</div>`;
+  const first = d.sockets.find(s => s.alloc); if (first) $("tl-sock").value = first.id;
+  const fillConq = () => { $("tl-conq").innerHTML = `<option value="">dowolny</option>` + TL_CONQ[+$("tl-type").value - 1].map((n, i) => `<option value="${i + 1}">${n}</option>`).join(""); };
+  fillConq(); $("tl-type").onchange = fillConq;
+  $("jw-goal").value = JW.goal; $("jw-goal").onchange = (e) => JW.goal = e.target.value;
+  $("jw-main").innerHTML = `<p class="muted">Wpisz, jakich modyfikacji szukasz. Aplikacja znajdzie seedy, które je dają w okolicy wybranego socketu, policzy zysk dla Twojego buildu i (opcjonalnie) znajdzie najtańsze oferty.</p><div id="tl-out"></div>`;
+  $("tl-go").onclick = tlSearch;
+}
+async function tlSearch() {
+  const wanted = $("tl-want").value.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const [t, w] = l.split(";"); return { text: t.trim(), weight: parseFloat(w) || 1 }; });
+  if (!wanted.length) { toast("Wpisz co najmniej jedną szukaną statystykę."); return; }
+  const type = +$("tl-type").value, price = $("tl-price").checked, out = $("tl-out");
+  out.innerHTML = `<div class="pbar" style="padding-left:0"><div class="track"><div class="fill" id="tl-fill"></div></div><span class="pct" id="tl-pct">0%</span></div><p class="muted" id="tl-msg">Skanuję seedy…</p>`;
+  $("tl-go").disabled = true;
+  const body = { type, socket: +$("tl-sock").value, wanted, goal: JW.goal, conqueror: $("tl-conq").value ? +$("tl-conq").value : null, alloc: true, price, sort: $("tl-sort").value, status: $("pr-status").value, scan_top: price ? 24 : 16, top_n: 12 };
+  try {
+    const r = await fetch("/api/jewels/timeless", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) { out.innerHTML = `<p class="loss">${esc((await r.json()).detail || "Błąd")}</p>`; $("tl-go").disabled = false; return; }
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "", res = null, err = null;
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2); if (!line.startsWith("data:")) continue;
+        const e = JSON.parse(line.slice(5));
+        if (e.type === "progress") { const p = Math.round(e.frac * 100); $("tl-fill").style.width = p + "%"; $("tl-pct").textContent = p + "%"; $("tl-msg").textContent = e.frac < 0.7 || !price ? "Liczę najlepsze seedy w PoB…" : "Sprawdzam ceny na trade…"; }
+        else if (e.type === "result") res = e.data; else if (e.type === "error") err = e.text;
+      }
+    }
+    if (err) out.innerHTML = `<p class="loss">${esc(err)}</p>`; else if (res) tlRender(res, type, price);
+  } catch (e) { out.innerHTML = `<p class="loss">Brak połączenia z serwerem: ${esc(e.message)}</p>`; }
+  $("tl-go").disabled = false;
+}
+function tlRender(res, type, priced) {
+  const rows = res.ranking.map(r => {
+    const hits = (r.hits || []).slice(0, 3).map(h => `<div class="muted">${esc(h.node)}: ${esc(h.gets)}</div>`).join("");
+    const p = r.cheapest ? `<b>${esc(r.cheapest.price_text)}</b>${r.cheapest.price_chaos != null ? `<div class="muted">≈ ${chaosTxt(r.cheapest.price_chaos)} · ofert: ${r.listed}</div>` : ""}` : (priced ? `<span class="muted">${r.price_error ? "brak ceny" : "brak ofert"}</span>` : "");
+    return `<tr><td class="num"><b>${r.seed}</b><div class="muted">${esc(r.conqueror.split(" ")[0])}</div></td><td class="num ${clsDelta(r.delta_pct)}">${pctTxt(r.delta_pct)}</td><td>${hits}</td>${priced ? `<td>${p}</td>` : ""}
+      <td><div class="row" style="margin:0"><button class="small" type="button" data-try="${r.seed}|${r.conqueror_index}">Wypróbuj</button>${r.trade_url ? `<button class="small" type="button" data-web="${esc(r.trade_url)}">Trade</button>` : ""}</div></td></tr>`;
+  }).join("");
+  const warn = [res.price_error ? `Ceny: ${res.price_error}` : "", res.note || ""].filter(Boolean).map(t => `<p class="loss">${esc(t)}</p>`).join("");
+  $("tl-out").innerHTML = `${warn}<div class="sum"><div>przeskanowane seedy<b>${res.seeds_scanned}</b></div><div>pasujące<b>${res.seeds_matching}</b></div><div>nody w zasięgu<b>${res.nodes_in_radius_counted}</b></div><div>cel<b style="font-size:14px">${esc(res.metric)}</b></div></div>
+    ${rows ? `<table class="tbl"><thead><tr><th>Seed</th><th>${esc(res.metric)}</th><th>Co daje w okolicy</th>${priced ? "<th>Najtaniej</th>" : ""}<th></th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="muted">Nic nie spełniło warunków (progi przeżywalności) albo żaden seed nie pasuje do wpisanych fraz.</p>`}
+    <p class="muted">${esc((res.not_checked || []).join(" "))}</p><div id="jw-out"></div>`;
+  $("tl-out").querySelectorAll("button[data-try]").forEach(b => b.onclick = () => { const [seed, cq] = b.dataset.try.split("|"); jwRun("/api/jewels/try", { socket: +$("tl-sock").value, timeless_type: type, seed: +seed, conqueror: +cq, goal: JW.goal, alloc: true }, `${TL_TYPES[type - 1]} ${seed} (${TL_CONQ[type - 1][cq - 1]})`); });
+  $("tl-out").querySelectorAll("button[data-web]").forEach(b => b.onclick = () => fetch("/api/open_url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: b.dataset.web }) }));
+}
+function jwTab(n) { JW.tab = n; $("jw-t1").classList.toggle("on", n === 1); $("jw-t2").classList.toggle("on", n === 2); if (JW.data) (n === 1 ? jwSockets : jwTimeless)(); }
+$("jw-t1").onclick = () => jwTab(1); $("jw-t2").onclick = () => jwTab(2);
+$("jw-close").onclick = () => $("jewel-pane").classList.remove("open");
+$("open-jewels").onclick = async () => { openPane("jewel-pane"); if (await jwLoad()) jwTab(JW.tab); };
+
+bindChips();
+
+refreshStatus();
+</script>
+</body>
+</html>

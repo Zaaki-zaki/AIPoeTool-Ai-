@@ -17,7 +17,7 @@ from app.gamedata import GameDB
 from app.parser.models import Build
 
 COLOR_LETTER = {1: "R", 2: "G", 3: "B", 4: "W"}
-SIDE_STATS = ("Life", "EnergyShield", "TotalEHP", "ManaUnreserved", "LifeUnreserved")
+SIDE_STATS = ("CombinedDPS", "Life", "EnergyShield", "TotalEHP", "ManaUnreserved", "LifeUnreserved")
 
 # Domyślne progi: wynik nie może pogorszyć tych statów poniżej podanej części OBECNEGO buildu
 # (stan grupy sprzed jakichkolwiek zmian). Wyłączenie: floor={}.
@@ -189,10 +189,14 @@ def _run(
         return {"name": c["name"], "level": c["level"], "quality": gem_quality}
 
     def side(stats: dict[str, Any]) -> dict[str, float]:
-        return {
-            k: round(stats[k] - base_stats[k], 2)
-            for k in SIDE_STATS if k in stats and k in base_stats and stats[k] != base_stats[k]
-        }
+        """Zmiana statów pobocznych w % względem obecnego buildu (zmiany poniżej 0,1% pomijane)."""
+        out = {}
+        for k in SIDE_STATS:
+            if k != metric and k in stats and base_stats.get(k):
+                pct = (stats[k] - base_stats[k]) / base_stats[k] * 100
+                if abs(pct) >= 0.1:
+                    out[f"{k}_pct"] = round(pct, 2)
+        return out
 
     result: dict[str, Any] = {
         "mode": mode, "skill": skill_name, "metric": metric, "baseline": round(base_val, 2),
